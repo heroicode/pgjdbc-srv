@@ -115,9 +115,13 @@ A forged answer can still point at another host in the same domain. Thus:
 
 - Use `sslmode=verify-full`. Without it, a forged answer can send your credentials to any host
   in the domain.
-- Do not let the expected domain be one that other parties can get names and certificates in,
-  such as `co.uk` or a shared hosting domain. The default for `db.co.uk` is `co.uk`. In such a
-  case, set `srvTargetDomain`.
+- Do not let the expected domain be one that other parties can get names and certificates in.
+  The driver does not know which domains these are. Examples:
+  - A registry suffix such as `co.uk` or `com.au`. The default for `db.co.uk` is `co.uk`.
+  - A domain of a hosting or cloud platform, such as `herokuapp.com`, `github.io` or
+    `azurewebsites.net`. The default for `my-db.herokuapp.com` is `herokuapp.com`.
+
+  In such a case, set `srvTargetDomain` to a domain that only you control.
 - Where you can, use a resolver that validates DNSSEC, and sign the zone.
 
 The driver also rejects SRV targets that are not plain host names, so a DNS answer cannot add
