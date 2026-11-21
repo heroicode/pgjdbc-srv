@@ -1,13 +1,46 @@
 # pgjdbc-srv
 
+[![CI](https://github.com/heroicode/pgjdbc-srv/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/heroicode/pgjdbc-srv/actions/workflows/ci.yml)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.heroicode/pgjdbc-srv)](https://central.sonatype.com/artifact/io.github.heroicode/pgjdbc-srv)
+[![javadoc](https://javadoc.io/badge2/io.github.heroicode/pgjdbc-srv/javadoc.svg)](https://javadoc.io/doc/io.github.heroicode/pgjdbc-srv)
+[![Java 8+](https://img.shields.io/badge/Java-8%2B-blue)](pom.xml)
+[![License: MIT](https://img.shields.io/github/license/heroicode/pgjdbc-srv)](LICENSE)
+
 DNS SRV record support for the PostgreSQL JDBC driver (pgjdbc).
 
 This is a small JDBC driver that sits in front of pgjdbc. It has no dependencies of its own,
 works with the pgjdbc version you already use, and runs on Java 8 and later.
 
+## Install
+
+Add this library next to the PostgreSQL JDBC driver. It does not bring pgjdbc with it, so keep
+your own `org.postgresql:postgresql` dependency.
+
+Maven:
+
+```xml
+<dependency>
+  <groupId>io.github.heroicode</groupId>
+  <artifactId>pgjdbc-srv</artifactId>
+  <version>0.1.0</version>
+</dependency>
+```
+
+Gradle (Kotlin DSL):
+
+```kotlin
+implementation("io.github.heroicode:pgjdbc-srv:0.1.0")
+```
+
+Gradle (Groovy DSL):
+
+```groovy
+implementation 'io.github.heroicode:pgjdbc-srv:0.1.0'
+```
+
 ## Usage
 
-Put this jar on the classpath next to `org.postgresql:postgresql` and change the URL scheme:
+Change the URL scheme:
 
 ```
 jdbc:postgresql+srv://db.example.com/orders?sslmode=require
