@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Logger;
 
 /**
@@ -88,7 +89,7 @@ public final class SrvDriver implements Driver {
 
   /** Creates a driver that uses the DNS client of the JDK and the PostgreSQL JDBC driver. */
   public SrvDriver() {
-    this(new DnsSrvResolver(), null, new Random());
+    this(new DnsSrvResolver(), null, null);
   }
 
   /**
@@ -97,7 +98,9 @@ public final class SrvDriver implements Driver {
    *
    * @param resolver the source of the SRV records
    * @param delegate the driver that makes the connection, or null to load the PostgreSQL driver
-   * @param random the source of randomness for the weighted order of equal-priority records
+   * @param random the source of randomness for the order of equal-priority records, or null to
+   *     use {@link ThreadLocalRandom}. One {@link Random} that many threads share makes them
+   *     wait for each other
    */
   public SrvDriver(SrvResolver resolver, Driver delegate, Random random) {
     this.resolver = resolver;
@@ -170,7 +173,8 @@ public final class SrvDriver implements Driver {
             "08001");
       }
     }
-    return srvUrl.toPostgresUrl(SrvRecord.order(usable, random));
+    Random source = random != null ? random : ThreadLocalRandom.current();
+    return srvUrl.toPostgresUrl(SrvRecord.order(usable, source));
   }
 
   @Override
