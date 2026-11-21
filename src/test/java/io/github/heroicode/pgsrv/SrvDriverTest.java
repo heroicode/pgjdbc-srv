@@ -415,6 +415,38 @@ class SrvDriverTest {
   }
 
   @Test
+  void anUnknownParameterThatStartsWithSrvIsAnError() throws SQLException {
+    for (String name :
+        new String[] {"srvtargetdomain", "srvTargetDomian", "SRVDNSSERVER", "srvhost", "srv"}) {
+      SQLException e =
+          assertThrows(
+              SQLException.class,
+              () ->
+                  resolve(
+                      "jdbc:postgresql+srv://db.example.com/db?" + name + "=example.net",
+                      "pg1.example.com"),
+              name);
+      assertTrue(e.getMessage().contains(name), e.getMessage());
+
+      Properties info = new Properties();
+      info.setProperty(name, "example.net");
+      SrvDriver driver =
+          new SrvDriver(
+              new FixedResolver(new SrvRecord(1, 0, 5432, "pg1.example.com")),
+              new RecordingDriver(),
+              new Random(1));
+      assertThrows(
+          SQLException.class,
+          () -> driver.resolve("jdbc:postgresql+srv://db.example.com/db", info),
+          name);
+    }
+    // Other names are passed on as before.
+    assertEquals(
+        "jdbc:postgresql://pg1.example.com:5432/db",
+        resolve("jdbc:postgresql+srv://db.example.com/db?service=x&sslmode=require", "pg1.example.com"));
+  }
+
+  @Test
   void otherUrlsAreNotAccepted() throws SQLException {
     SrvDriver driver = new SrvDriver(new FixedResolver(), new RecordingDriver(), new Random(1));
 

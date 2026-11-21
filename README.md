@@ -87,6 +87,10 @@ Give these in the URL or in the connection properties. The URL wins, except for
 | `srvDnsServer`   | OS resolver  | DNS server to query, as `host` or `host:port`.                       |
 | `srvTargetDomain`| see Security | Domain that all SRV targets must be in.                              |
 
+The names are case-sensitive. A parameter that starts with `srv` and is not in this table, such
+as `srvtargetdomain`, is an error. This prevents a misspelled name that is ignored without a
+message.
+
 If the name in the URL already starts with `_` (for example
 `jdbc:postgresql+srv://_pg._tcp.example.com/orders`), it is looked up as it is. Such a name
 already contains the service, so it is an error to give `srvServiceName` with it.

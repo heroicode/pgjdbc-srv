@@ -32,6 +32,7 @@ import java.util.logging.Logger;
  * properties. If {@code srvServiceName} or {@code srvDnsServer} is in both, the URL is used. For
  * {@code srvTargetDomain} the values must be the same. All other parameters and properties are
  * passed on to the PostgreSQL driver, and for those the URL is used if a parameter is in both.
+ * The names are case-sensitive. A different name that starts with {@code srv} is an error.
  *
  * <dl>
  *   <dt>{@code srvServiceName}

@@ -94,6 +94,9 @@ final class SrvUrl {
     String dnsServer = (String) properties.remove(DNS_SERVER_PROPERTY);
     String targetDomain = addTargetDomain(null, (String) properties.remove(TARGET_DOMAIN_PROPERTY));
     targetDomain = addTargetDomain(targetDomain, (String) properties.remove(TARGET_DOMAIN_ALIAS));
+    for (String name : properties.stringPropertyNames()) {
+      refuseUnknownSrvParameter(name);
+    }
 
     // All other URL parameters are passed on as properties, not in the URL. The PostgreSQL
     // driver can put the URL that it gets in its error messages, and a parameter can be a
@@ -118,6 +121,7 @@ final class SrvUrl {
       } else if (TARGET_DOMAIN_PROPERTY.equals(name) || TARGET_DOMAIN_ALIAS.equals(name)) {
         targetDomain = addTargetDomain(targetDomain, value);
       } else {
+        refuseUnknownSrvParameter(name);
         properties.setProperty(name, value);
       }
     }
@@ -197,6 +201,26 @@ final class SrvUrl {
               + " must agree");
     }
     return domain;
+  }
+
+  /**
+   * Names that start with "srv" are for this driver, and the PostgreSQL driver has none. A name
+   * of that type that is not known is an error in the spelling or in the case of the letters. If
+   * it were passed on, the PostgreSQL driver would ignore it, and a limit such as the target
+   * domain would be absent with no message.
+   */
+  private static void refuseUnknownSrvParameter(String name) throws SQLException {
+    if (name.toLowerCase(Locale.ROOT).startsWith("srv")) {
+      throw invalid(
+          "the parameter "
+              + name
+              + " is not known. The names are case-sensitive: "
+              + SERVICE_NAME_PROPERTY
+              + ", "
+              + DNS_SERVER_PROPERTY
+              + ", "
+              + TARGET_DOMAIN_PROPERTY);
+    }
   }
 
   private static String stripDots(String name) {
