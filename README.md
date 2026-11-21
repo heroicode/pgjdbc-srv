@@ -132,6 +132,10 @@ person who controls them controls where the driver connects.
   open connection does not move when the records change.
 - A DNS failure, or a name with no SRV records, gives an `SQLException` with SQLSTATE `08001`.
   There is no fallback to an A/AAAA lookup of the name.
+- The DNS lookup has its own time limit. The `connectTimeout` and `loginTimeout` parameters of
+  pgjdbc do not change it. A DNS server that does not answer delays a new connection by
+  approximately 6 seconds for each such server, before the lookup fails or the next DNS server
+  is tried.
 
 ## Build
 

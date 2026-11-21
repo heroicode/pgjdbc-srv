@@ -28,8 +28,9 @@ import java.util.logging.Logger;
  * <h2>Parameters</h2>
  *
  * <p>These parameters belong to this driver. Give them in the URL or in the connection
- * properties. If a parameter is in both, the URL is used. All other parameters and properties are
- * passed on to the PostgreSQL driver.
+ * properties. If {@code srvServiceName} or {@code srvDnsServer} is in both, the URL is used. For
+ * {@code srvTargetDomain} the values must be the same. All other parameters and properties are
+ * passed on to the PostgreSQL driver, and for those the URL is used if a parameter is in both.
  *
  * <dl>
  *   <dt>{@code srvServiceName}
@@ -59,6 +60,11 @@ import java.util.logging.Logger;
  *
  * <p>A failed DNS lookup, or a name that has no SRV records, gives an {@link SQLException} with
  * SQLSTATE {@code 08001}. The lookup is done again for each new connection and is not cached.
+ *
+ * <p>The lookup has its own time limit, which the {@code connectTimeout} and {@code loginTimeout}
+ * parameters of the PostgreSQL driver do not change. A DNS server that does not answer delays the
+ * connection attempt by approximately 6 seconds before the lookup fails or goes to the next DNS
+ * server.
  */
 public final class SrvDriver implements Driver {
   private static final String POSTGRES_DRIVER_CLASS = "org.postgresql.Driver";
