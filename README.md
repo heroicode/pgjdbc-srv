@@ -38,8 +38,12 @@ Gradle (Groovy DSL):
 implementation 'io.github.heroicode:pgjdbc-srv:0.2.1'
 ```
 
-Do not use version 0.1.0. It has security defects that 0.2.0 corrects: a forged DNS answer
-could change the connection parameters, and SRV targets were not limited to a domain.
+Do not use versions 0.1.0 and 0.2.0:
+
+- 0.1.0 has security defects. A forged DNS answer could change the connection parameters, and
+  SRV targets were not limited to a domain.
+- 0.2.0 corrects those defects, but does not give records of equal priority a fair order. When
+  all the weights are 0, it always tries the first record of the DNS answer first.
 
 ## Usage
 
