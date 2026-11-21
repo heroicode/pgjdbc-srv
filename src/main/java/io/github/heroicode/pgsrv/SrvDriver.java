@@ -98,7 +98,17 @@ public final class SrvDriver implements Driver {
       return null;
     }
     SrvUrl srvUrl = SrvUrl.parse(url, info);
-    return delegate().connect(resolveUrl(srvUrl), srvUrl.getProperties());
+    Connection connection = delegate().connect(resolveUrl(srvUrl), srvUrl.getProperties());
+    if (connection == null) {
+      // A JDBC driver returns null for a URL that it does not accept. To return null from here
+      // would say that this driver does not accept the SRV URL, which is not correct.
+      throw new SQLException(
+          "The PostgreSQL JDBC driver did not accept the URL made from the SRV records of "
+              + srvUrl.getSrvName()
+              + ". Examine the database name and the parameters in the URL.",
+          "08001");
+    }
+    return connection;
   }
 
   /**

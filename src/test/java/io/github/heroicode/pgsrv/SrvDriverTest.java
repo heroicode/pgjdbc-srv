@@ -45,7 +45,7 @@ class SrvDriverTest {
 
   /** Delegate driver that remembers the URL and properties it was given. */
   private static final class RecordingDriver implements Driver {
-    final Connection connection =
+    Connection connection =
         (Connection)
             Proxy.newProxyInstance(
                 SrvDriverTest.class.getClassLoader(),
@@ -287,6 +287,27 @@ class SrvDriverTest {
       assertFalse(e.getMessage().contains("hunter2"), e.getMessage());
       assertTrue(e.getMessage().contains("jdbc:postgresql"), e.getMessage());
     }
+  }
+
+  @Test
+  void aDelegateThatDoesNotAcceptTheUrlGivesAnError() {
+    RecordingDriver delegate = new RecordingDriver();
+    delegate.connection = null;
+    SrvDriver driver =
+        new SrvDriver(
+            new FixedResolver(new SrvRecord(1, 0, 5432, "pg1.example.com")),
+            delegate,
+            new Random(1));
+
+    SQLException e =
+        assertThrows(
+            SQLException.class,
+            () ->
+                driver.connect(
+                    "jdbc:postgresql+srv://db.example.com/orders?password=hunter2", null));
+    assertEquals("08001", e.getSQLState());
+    assertTrue(e.getMessage().contains("_postgresql._tcp.db.example.com"), e.getMessage());
+    assertFalse(e.getMessage().contains("hunter2"), e.getMessage());
   }
 
   @Test
