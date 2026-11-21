@@ -107,16 +107,18 @@ public final class SrvRecord {
     for (List<SrvRecord> pool : byPriority.values()) {
       // Zero-weight records go first so that they keep a small chance of selection.
       pool.sort(Comparator.comparingInt(SrvRecord::getWeight));
+      // The sum of the weights can be larger than an int holds.
+      long total = 0;
+      for (SrvRecord record : pool) {
+        total += record.weight;
+      }
       while (!pool.isEmpty()) {
-        int total = 0;
-        for (SrvRecord record : pool) {
-          total += record.weight;
-        }
-        int pick = random.nextInt(total + 1);
-        int running = 0;
+        long pick = Math.min(total, (long) (random.nextDouble() * (total + 1)));
+        long running = 0;
         for (int i = 0; i < pool.size(); i++) {
           running += pool.get(i).weight;
           if (running >= pick) {
+            total -= pool.get(i).weight;
             ordered.add(pool.remove(i));
             break;
           }

@@ -497,6 +497,22 @@ class SrvDriverTest {
   }
 
   @Test
+  void aSumOfWeightsLargerThanAnIntIsPermitted() {
+    // 33,000 records of the largest weight have a sum above Integer.MAX_VALUE.
+    List<SrvRecord> records = new ArrayList<SrvRecord>();
+    for (int i = 0; i < 33000; i++) {
+      records.add(new SrvRecord(1, 65535, 5432, "pg" + i + ".example.com"));
+    }
+    records.add(new SrvRecord(0, 65535, 5432, "first.example.com"));
+
+    List<SrvRecord> ordered = SrvRecord.order(records, new Random(7));
+
+    assertEquals(33001, ordered.size());
+    assertEquals("first.example.com", ordered.get(0).getTarget());
+    assertEquals(33001, new java.util.HashSet<SrvRecord>(ordered).size());
+  }
+
+  @Test
   void recordDataIsParsed() {
     SrvRecord record = SrvRecord.parse("10 60 5432 db1.example.com.");
     assertEquals(10, record.getPriority());
