@@ -110,6 +110,10 @@ A forged answer can still point at another host in the same domain. Thus:
 The driver also rejects SRV targets that are not plain host names, so a DNS answer cannot add
 or change connection parameters.
 
+Do not build the URL or the connection properties from input that you do not trust.
+`srvDnsServer` selects the DNS server, and `srvTargetDomain` selects the permitted domain, so a
+person who controls them controls where the driver connects.
+
 ## Limits
 
 - The URL takes one DNS name and no port. The SRV records supply the hosts and ports.

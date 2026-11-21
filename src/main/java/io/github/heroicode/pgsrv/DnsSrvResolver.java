@@ -4,6 +4,8 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.naming.Context;
 import javax.naming.NamingEnumeration;
@@ -19,8 +21,31 @@ public final class DnsSrvResolver implements SrvResolver {
   /** SQLSTATE: the client is unable to establish the connection. */
   static final String CONNECTION_UNABLE_TO_CONNECT = "08001";
 
+  /** A host name, an IPv4 address or an IPv6 address in brackets, and an optional port. */
+  private static final Pattern DNS_SERVER =
+      Pattern.compile("([A-Za-z0-9_.-]+|\\[[0-9A-Fa-f:.]+\\])(?::([0-9]{1,5}))?");
+
+  /** True if the value is {@code host} or {@code host:port} and nothing more. */
+  static boolean isDnsServer(String dnsServer) {
+    Matcher matcher = DNS_SERVER.matcher(dnsServer);
+    if (!matcher.matches()) {
+      return false;
+    }
+    String host = matcher.group(1);
+    if (!host.startsWith("[") && !SrvRecord.isHostName(host)) {
+      return false;
+    }
+    String port = matcher.group(2);
+    return port == null || (Integer.parseInt(port) >= 1 && Integer.parseInt(port) <= 65535);
+  }
+
   @Override
   public List<SrvRecord> resolve(String srvName, String dnsServer) throws SQLException {
+    // The value becomes part of the JNDI provider URL, where a "/" would start a base domain.
+    if (dnsServer != null && !isDnsServer(dnsServer)) {
+      throw new SQLException(
+          "srvDnsServer must be host or host:port", CONNECTION_UNABLE_TO_CONNECT);
+    }
     Hashtable<String, String> env = new Hashtable<String, String>();
     env.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.dns.DnsContextFactory");
     env.put(Context.PROVIDER_URL, dnsServer == null ? "dns:" : "dns://" + dnsServer);

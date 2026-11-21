@@ -2,6 +2,7 @@ package io.github.heroicode.pgsrv;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.sql.SQLException;
 import java.util.List;
@@ -63,6 +64,40 @@ class DnsSrvResolverTest {
                               + dns.address(),
                           null));
       assertEquals("08001", e.getSQLState());
+    }
+  }
+
+  @Test
+  void theDnsServerMustBeAHostWithAnOptionalPort() {
+    for (String server :
+        new String[] {
+          "10.0.0.53/attacker.test",
+          "10.0.0.53/",
+          "dns://10.0.0.53",
+          "10.0.0.53 10.0.0.54",
+          "10.0.0.53:0",
+          "10.0.0.53:65536",
+          "10.0.0.53:53:53",
+          "10.0.0.53:",
+          "user@10.0.0.53",
+          "10.0.0.53?x=1",
+          "10.0.0.53#x",
+          "[::1",
+          "::1",
+          "[::1]x",
+          "",
+        }) {
+      SQLException e =
+          assertThrows(
+              SQLException.class,
+              () -> new DnsSrvResolver().resolve("_postgresql._tcp.db.test", server),
+              server);
+      assertEquals("08001", e.getSQLState());
+      assertTrue(e.getMessage().contains("srvDnsServer"), e.getMessage());
+    }
+    for (String server :
+        new String[] {"10.0.0.53", "10.0.0.53:5353", "ns1.example.com", "[::1]", "[fe80::1]:53"}) {
+      assertTrue(DnsSrvResolver.isDnsServer(server), server);
     }
   }
 
