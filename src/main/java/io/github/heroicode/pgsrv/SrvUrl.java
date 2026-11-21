@@ -82,6 +82,9 @@ final class SrvUrl {
     if (host.endsWith(".")) {
       host = host.substring(0, host.length() - 1);
     }
+    if (!SrvRecord.isHostName(host)) {
+      throw invalid(url, "the DNS name is not a valid host name");
+    }
 
     // Copy by name so that defaults nested in the caller's Properties are kept.
     Properties properties = new Properties();
@@ -232,7 +235,27 @@ final class SrvUrl {
     }
   }
 
+  /**
+   * Returns the URL in a form that is safe to put in a message or a log. URL parameters and user
+   * information can contain a password, so they are removed.
+   */
+  static String redact(String url) {
+    int queryStart = url.indexOf('?');
+    String safe = queryStart < 0 ? url : url.substring(0, queryStart);
+    int authorityStart = safe.indexOf("//");
+    if (authorityStart >= 0) {
+      authorityStart += 2;
+      int pathStart = safe.indexOf('/', authorityStart);
+      int authorityEnd = pathStart < 0 ? safe.length() : pathStart;
+      int userInfoEnd = safe.lastIndexOf('@', authorityEnd - 1);
+      if (userInfoEnd >= authorityStart) {
+        safe = safe.substring(0, authorityStart) + safe.substring(userInfoEnd + 1);
+      }
+    }
+    return safe;
+  }
+
   private static SQLException invalid(String url, String reason) {
-    return new SQLException("Invalid URL " + url + ": " + reason, INVALID_URL_STATE);
+    return new SQLException("Invalid URL " + redact(url) + ": " + reason, INVALID_URL_STATE);
   }
 }

@@ -270,6 +270,26 @@ class SrvDriverTest {
   }
 
   @Test
+  void errorMessagesDoNotContainCredentialsFromTheUrl() {
+    SrvDriver driver = new SrvDriver(new FixedResolver(), new RecordingDriver(), new Random(1));
+    for (String url :
+        new String[] {
+          "jdbc:postgresql+srv://a,b/db?user=u&password=hunter2",
+          "jdbc:postgresql+srv://a.test:5432/db?password=hunter2",
+          "jdbc:postgresql+srv:///db?password=hunter2",
+          "jdbc:postgresql+srv://u:hunter2@a.test/db",
+          "jdbc:postgresql+srv://hunter2@a.test/db",
+          "jdbc:postgresql+srv://a.test/db?srvTargetDomain=a/b&password=hunter2",
+          "jdbc:postgresql+srv://a.test/db?srvTargetDomain=x&srvAllowedHostsSuffix=y&password=hunter2",
+          "jdbc:postgresql://u:hunter2@a.test/db?password=hunter2",
+        }) {
+      SQLException e = assertThrows(SQLException.class, () -> driver.resolve(url, null), url);
+      assertFalse(e.getMessage().contains("hunter2"), e.getMessage());
+      assertTrue(e.getMessage().contains("jdbc:postgresql"), e.getMessage());
+    }
+  }
+
+  @Test
   void aServiceThatIsMarkedNotAvailableGivesAnError() {
     SrvDriver driver =
         new SrvDriver(
