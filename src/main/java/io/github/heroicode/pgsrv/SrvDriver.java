@@ -118,7 +118,9 @@ public final class SrvDriver implements Driver {
     DriverPropertyInfo targetDomain = new DriverPropertyInfo(SrvUrl.TARGET_DOMAIN_PROPERTY, null);
     targetDomain.description =
         "Domain that all SRV targets must be in. Default: the name in the URL without its first"
-            + " label, or the name itself if it has fewer than three labels.";
+            + " label, or the name itself if it has fewer than three labels. "
+            + SrvUrl.TARGET_DOMAIN_ALIAS
+            + " is another name for this parameter.";
     return new DriverPropertyInfo[] {serviceName, dnsServer, targetDomain};
   }
 

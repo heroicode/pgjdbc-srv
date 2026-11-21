@@ -206,6 +206,50 @@ class SrvDriverTest {
   }
 
   @Test
+  void srvAllowedHostsSuffixIsAnotherNameForTheTargetDomain() throws SQLException {
+    FixedResolver resolver = new FixedResolver(new SrvRecord(1, 0, 5432, "pg1.example.net"));
+    RecordingDriver delegate = new RecordingDriver();
+    SrvDriver driver = new SrvDriver(resolver, delegate, new Random(1));
+
+    Properties info = new Properties();
+    info.setProperty("srvAllowedHostsSuffix", ".example.net");
+    driver.connect("jdbc:postgresql+srv://db.example.com/orders", info);
+    assertEquals("jdbc:postgresql://pg1.example.net:5432/orders", delegate.url);
+    assertFalse(delegate.info.containsKey("srvAllowedHostsSuffix"));
+
+    // In the URL, and not passed on.
+    assertEquals(
+        "jdbc:postgresql://pg1.example.net:5432/orders?ssl=true",
+        driver.resolve(
+            "jdbc:postgresql+srv://db.example.com/orders?srvAllowedHostsSuffix=example.net&ssl=true",
+            null));
+
+    // The URL wins over the properties, whichever name each one uses.
+    info.setProperty("srvAllowedHostsSuffix", "other.test");
+    assertEquals(
+        "jdbc:postgresql://pg1.example.net:5432/orders",
+        driver.resolve(
+            "jdbc:postgresql+srv://db.example.com/orders?srvTargetDomain=example.net", info));
+
+    // Both names with the same value are accepted. Different values are an error.
+    assertEquals(
+        "jdbc:postgresql://pg1.example.net:5432/orders",
+        driver.resolve(
+            "jdbc:postgresql+srv://db.example.com/orders"
+                + "?srvTargetDomain=example.net&srvAllowedHostsSuffix=.EXAMPLE.net",
+            null));
+    SQLException e =
+        assertThrows(
+            SQLException.class,
+            () ->
+                driver.resolve(
+                    "jdbc:postgresql+srv://db.example.com/orders"
+                        + "?srvTargetDomain=example.net&srvAllowedHostsSuffix=example.org",
+                    null));
+    assertTrue(e.getMessage().contains("different values"), e.getMessage());
+  }
+
+  @Test
   void otherUrlsAreNotAccepted() throws SQLException {
     SrvDriver driver = new SrvDriver(new FixedResolver(), new RecordingDriver(), new Random(1));
 

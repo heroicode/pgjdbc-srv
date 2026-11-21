@@ -95,6 +95,8 @@ To limit this, the driver refuses to connect if an SRV target is outside the exp
 - If the name has fewer than three labels (`example.com`), the targets must be below that name.
 - To use targets in a different domain, give that domain in `srvTargetDomain`, for example
   `?srvTargetDomain=db.cloud-provider.example`.
+- `srvAllowedHostsSuffix`, the name that MongoDB drivers use, is accepted as another name for
+  `srvTargetDomain`. If you give both, they must have the same value.
 
 A forged answer can still point at another host in the same domain. Thus:
 

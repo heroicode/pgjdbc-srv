@@ -13,13 +13,15 @@ import java.util.Properties;
  *
  * <p>The parameters {@code srvServiceName}, {@code srvDnsServer} and {@code srvTargetDomain}
  * belong to this wrapper. They can be given in the URL or in the connection properties (the URL
- * wins), and are not passed on to the PostgreSQL driver.
+ * wins), and are not passed on to the PostgreSQL driver. {@code srvAllowedHostsSuffix}, the name
+ * that MongoDB drivers use, is accepted as another name for {@code srvTargetDomain}.
  */
 final class SrvUrl {
   static final String PREFIX = "jdbc:postgresql+srv://";
   static final String SERVICE_NAME_PROPERTY = "srvServiceName";
   static final String DNS_SERVER_PROPERTY = "srvDnsServer";
   static final String TARGET_DOMAIN_PROPERTY = "srvTargetDomain";
+  static final String TARGET_DOMAIN_ALIAS = "srvAllowedHostsSuffix";
   static final String DEFAULT_SERVICE_NAME = "postgresql";
 
   private static final String INVALID_URL_STATE = "08001";
@@ -90,7 +92,13 @@ final class SrvUrl {
     }
     String serviceName = (String) properties.remove(SERVICE_NAME_PROPERTY);
     String dnsServer = (String) properties.remove(DNS_SERVER_PROPERTY);
-    String targetDomain = (String) properties.remove(TARGET_DOMAIN_PROPERTY);
+    String targetDomain =
+        sameTargetDomain(
+            url,
+            (String) properties.remove(TARGET_DOMAIN_PROPERTY),
+            (String) properties.remove(TARGET_DOMAIN_ALIAS));
+    String urlTargetDomain = null;
+    String urlTargetDomainAlias = null;
 
     List<String> passedOn = new ArrayList<String>();
     for (String parameter : rawQuery.split("&")) {
@@ -105,12 +113,17 @@ final class SrvUrl {
       } else if (DNS_SERVER_PROPERTY.equals(name)) {
         dnsServer = value;
       } else if (TARGET_DOMAIN_PROPERTY.equals(name)) {
-        targetDomain = value;
+        urlTargetDomain = value;
+      } else if (TARGET_DOMAIN_ALIAS.equals(name)) {
+        urlTargetDomainAlias = value;
       } else {
         passedOn.add(parameter);
       }
     }
 
+    if (urlTargetDomain != null || urlTargetDomainAlias != null) {
+      targetDomain = sameTargetDomain(url, urlTargetDomain, urlTargetDomainAlias);
+    }
     if (serviceName == null || serviceName.isEmpty()) {
       serviceName = DEFAULT_SERVICE_NAME;
     }
@@ -148,6 +161,21 @@ final class SrvUrl {
     int firstDot = name.indexOf('.');
     boolean hasThreeLabels = firstDot >= 0 && name.indexOf('.', firstDot + 1) >= 0;
     return hasThreeLabels ? name.substring(firstDot + 1) : name;
+  }
+
+  /** Returns the value that was given. It is an error to give the two names different values. */
+  private static String sameTargetDomain(String url, String value, String aliasValue)
+      throws SQLException {
+    if (value == null) {
+      return aliasValue;
+    }
+    if (aliasValue != null
+        && !stripDots(value).equalsIgnoreCase(stripDots(aliasValue))) {
+      throw invalid(
+          url,
+          TARGET_DOMAIN_PROPERTY + " and " + TARGET_DOMAIN_ALIAS + " have different values");
+    }
+    return value;
   }
 
   private static String stripDots(String name) {
