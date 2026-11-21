@@ -71,19 +71,19 @@ final class SrvUrl {
 
     String host = rest;
     if (host.isEmpty()) {
-      throw invalid(url, "the DNS name is missing");
+      throw invalid("the DNS name is missing");
     }
     if (host.indexOf(',') >= 0) {
-      throw invalid(url, "only one DNS name is permitted");
+      throw invalid("only one DNS name is permitted");
     }
     if (host.indexOf(':') >= 0) {
-      throw invalid(url, "a port is not permitted, because the SRV records supply the ports");
+      throw invalid("a port is not permitted, because the SRV records supply the ports");
     }
     if (host.endsWith(".")) {
       host = host.substring(0, host.length() - 1);
     }
     if (!SrvRecord.isHostName(host)) {
-      throw invalid(url, "the DNS name is not a valid host name");
+      throw invalid("the DNS name is not a valid host name");
     }
 
     // Copy by name so that defaults nested in the caller's Properties are kept.
@@ -139,16 +139,14 @@ final class SrvUrl {
     String srvName;
     if (host.startsWith("_")) {
       if (serviceNameGiven) {
-        throw invalid(
-            url,
-            SERVICE_NAME_PROPERTY
+        throw invalid(SERVICE_NAME_PROPERTY
                 + " cannot be used with a DNS name that starts with \"_\", because that name"
                 + " already contains the service");
       }
       srvName = host;
     } else {
       if (serviceName.indexOf('.') >= 0 || !SrvRecord.isHostName(serviceName)) {
-        throw invalid(url, SERVICE_NAME_PROPERTY + " is not a valid DNS label");
+        throw invalid(SERVICE_NAME_PROPERTY + " is not a valid DNS label");
       }
       srvName = "_" + serviceName + "._tcp." + host;
     }
@@ -158,7 +156,7 @@ final class SrvUrl {
     } else {
       targetDomain = stripDots(targetDomain);
       if (!SrvRecord.isHostName(targetDomain)) {
-        throw invalid(url, TARGET_DOMAIN_PROPERTY + " is not a valid domain name");
+        throw invalid(TARGET_DOMAIN_PROPERTY + " is not a valid domain name");
       }
     }
     targetDomain = targetDomain.toLowerCase(Locale.ROOT);
@@ -190,9 +188,7 @@ final class SrvUrl {
     }
     if (aliasValue != null
         && !stripDots(value).equalsIgnoreCase(stripDots(aliasValue))) {
-      throw invalid(
-          url,
-          TARGET_DOMAIN_PROPERTY + " and " + TARGET_DOMAIN_ALIAS + " have different values");
+      throw invalid(TARGET_DOMAIN_PROPERTY + " and " + TARGET_DOMAIN_ALIAS + " have different values");
     }
     return value;
   }
@@ -251,27 +247,9 @@ final class SrvUrl {
     }
   }
 
-  /**
-   * Returns the URL in a form that is safe to put in a message or a log. URL parameters and user
-   * information can contain a password, so they are removed.
-   */
-  static String redact(String url) {
-    int queryStart = url.indexOf('?');
-    String safe = queryStart < 0 ? url : url.substring(0, queryStart);
-    int authorityStart = safe.indexOf("//");
-    if (authorityStart >= 0) {
-      authorityStart += 2;
-      int pathStart = safe.indexOf('/', authorityStart);
-      int authorityEnd = pathStart < 0 ? safe.length() : pathStart;
-      int userInfoEnd = safe.lastIndexOf('@', authorityEnd - 1);
-      if (userInfoEnd >= authorityStart) {
-        safe = safe.substring(0, authorityStart) + safe.substring(userInfoEnd + 1);
-      }
-    }
-    return safe;
-  }
-
-  private static SQLException invalid(String url, String reason) {
-    return new SQLException("Invalid URL " + redact(url) + ": " + reason, INVALID_URL_STATE);
+  private static SQLException invalid(String reason) {
+    // The URL is not put in the message. It can contain a password in more than one place, and
+    // a URL that is not valid cannot be divided into safe and secret parts with certainty.
+    return new SQLException("Invalid " + PREFIX + " URL: " + reason, INVALID_URL_STATE);
   }
 }

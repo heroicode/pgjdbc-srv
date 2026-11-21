@@ -123,7 +123,7 @@ public final class SrvDriver implements Driver {
    */
   public String resolve(String url, Properties info) throws SQLException {
     if (!acceptsURL(url)) {
-      throw new SQLException("Not a " + SrvUrl.PREFIX + " URL: " + SrvUrl.redact(url), "08001");
+      throw new SQLException("The URL is not a " + SrvUrl.PREFIX + " URL", "08001");
     }
     return resolveUrl(SrvUrl.parse(url, info));
   }

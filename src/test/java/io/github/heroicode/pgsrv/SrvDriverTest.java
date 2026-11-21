@@ -337,9 +337,14 @@ class SrvDriverTest {
           "jdbc:postgresql+srv://a.test/db?srvTargetDomain=a/b&password=hunter2",
           "jdbc:postgresql+srv://a.test/db?srvTargetDomain=x&srvAllowedHostsSuffix=y&password=hunter2",
           "jdbc:postgresql://u:hunter2@a.test/db?password=hunter2",
+          "jdbc:postgresql+srv://user:hun/ter2@db.example.com/db",
+          "jdbc:postgresql+srv://user:hun?ter2@db.example.com/db",
+          "jdbc:postgresql+srv://a,b/db?password=hun@ter2",
+          "jdbc:postgresql+srv://a,b/db?password=hun//ter2@x",
         }) {
       SQLException e = assertThrows(SQLException.class, () -> driver.resolve(url, null), url);
-      assertFalse(e.getMessage().contains("hunter2"), e.getMessage());
+      assertFalse(e.getMessage().contains("hun"), e.getMessage());
+      assertFalse(e.getMessage().contains("ter2"), e.getMessage());
       assertTrue(e.getMessage().contains("jdbc:postgresql"), e.getMessage());
     }
   }
