@@ -1,0 +1,221 @@
+package io.github.heroicode.pgsrv;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.lang.reflect.Proxy;
+import java.sql.Connection;
+import java.sql.Driver;
+import java.sql.DriverManager;
+import java.sql.DriverPropertyInfo;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Random;
+import java.util.logging.Logger;
+
+import org.junit.jupiter.api.Test;
+
+class SrvDriverTest {
+  /** Resolver that returns fixed records and remembers what it was asked. */
+  private static final class FixedResolver implements SrvResolver {
+    final List<SrvRecord> records;
+    String askedName;
+    String askedServer;
+
+    FixedResolver(SrvRecord... records) {
+      this.records = Arrays.asList(records);
+    }
+
+    @Override
+    public List<SrvRecord> resolve(String srvName, String dnsServer) {
+      askedName = srvName;
+      askedServer = dnsServer;
+      return records;
+    }
+  }
+
+  /** Delegate driver that remembers the URL and properties it was given. */
+  private static final class RecordingDriver implements Driver {
+    final Connection connection =
+        (Connection)
+            Proxy.newProxyInstance(
+                SrvDriverTest.class.getClassLoader(),
+                new Class<?>[] {Connection.class},
+                (proxy, method, args) -> null);
+    String url;
+    Properties info;
+
+    @Override
+    public Connection connect(String url, Properties info) {
+      this.url = url;
+      this.info = info;
+      return connection;
+    }
+
+    @Override
+    public boolean acceptsURL(String url) {
+      return true;
+    }
+
+    @Override
+    public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) {
+      return new DriverPropertyInfo[0];
+    }
+
+    @Override
+    public int getMajorVersion() {
+      return 0;
+    }
+
+    @Override
+    public int getMinorVersion() {
+      return 0;
+    }
+
+    @Override
+    public boolean jdbcCompliant() {
+      return false;
+    }
+
+    @Override
+    public Logger getParentLogger() {
+      return null;
+    }
+  }
+
+  @Test
+  void connectsThroughTheDelegateWithAMultiHostUrlInPriorityOrder() throws SQLException {
+    FixedResolver resolver =
+        new FixedResolver(
+            new SrvRecord(20, 0, 5433, "standby.example.com"),
+            new SrvRecord(10, 0, 5432, "primary.example.com"));
+    RecordingDriver delegate = new RecordingDriver();
+    SrvDriver driver = new SrvDriver(resolver, delegate, new Random(1));
+
+    Properties info = new Properties();
+    info.setProperty("user", "app");
+    Connection connection =
+        driver.connect(
+            "jdbc:postgresql+srv://db.example.com/orders?sslmode=require&targetServerType=primary",
+            info);
+
+    assertSame(delegate.connection, connection);
+    assertEquals("_postgresql._tcp.db.example.com", resolver.askedName);
+    assertNull(resolver.askedServer);
+    assertEquals(
+        "jdbc:postgresql://primary.example.com:5432,standby.example.com:5433/orders"
+            + "?sslmode=require&targetServerType=primary",
+        delegate.url);
+    assertEquals("app", delegate.info.getProperty("user"));
+  }
+
+  @Test
+  void wrapperParametersAreUsedAndNotPassedOn() throws SQLException {
+    FixedResolver resolver = new FixedResolver(new SrvRecord(1, 1, 6432, "pool.example.com"));
+    RecordingDriver delegate = new RecordingDriver();
+    SrvDriver driver = new SrvDriver(resolver, delegate, new Random(1));
+
+    Properties info = new Properties();
+    info.setProperty("srvServiceName", "ignored-because-the-url-wins");
+    info.setProperty("srvDnsServer", "10.0.0.53");
+    driver.connect(
+        "jdbc:postgresql+srv://db.example.com/orders?srvServiceName=pgbouncer&ssl=true", info);
+
+    assertEquals("_pgbouncer._tcp.db.example.com", resolver.askedName);
+    assertEquals("10.0.0.53", resolver.askedServer);
+    assertEquals("jdbc:postgresql://pool.example.com:6432/orders?ssl=true", delegate.url);
+    assertFalse(delegate.info.containsKey("srvServiceName"));
+    assertFalse(delegate.info.containsKey("srvDnsServer"));
+    assertTrue(info.containsKey("srvDnsServer"), "the caller's Properties must not change");
+  }
+
+  @Test
+  void aNameThatStartsWithAnUnderscoreIsLookedUpAsItIs() throws SQLException {
+    FixedResolver resolver = new FixedResolver(new SrvRecord(1, 1, 5432, "a.example.com"));
+    SrvDriver driver = new SrvDriver(resolver, new RecordingDriver(), new Random(1));
+
+    assertEquals(
+        "jdbc:postgresql://a.example.com:5432/",
+        driver.resolve("jdbc:postgresql+srv://_pg._tcp.example.com.", null));
+    assertEquals("_pg._tcp.example.com", resolver.askedName);
+  }
+
+  @Test
+  void otherUrlsAreNotAccepted() throws SQLException {
+    SrvDriver driver = new SrvDriver(new FixedResolver(), new RecordingDriver(), new Random(1));
+
+    assertFalse(driver.acceptsURL("jdbc:postgresql://localhost/db"));
+    assertNull(driver.connect("jdbc:postgresql://localhost/db", new Properties()));
+    assertTrue(driver.acceptsURL("jdbc:postgresql+srv://db.example.com/db"));
+  }
+
+  @Test
+  void invalidUrlsAreRejected() {
+    SrvDriver driver = new SrvDriver(new FixedResolver(), new RecordingDriver(), new Random(1));
+
+    assertThrows(SQLException.class, () -> driver.connect("jdbc:postgresql+srv:///db", null));
+    assertThrows(
+        SQLException.class, () -> driver.connect("jdbc:postgresql+srv://a.test:5432/db", null));
+    assertThrows(
+        SQLException.class, () -> driver.connect("jdbc:postgresql+srv://a.test,b.test/db", null));
+  }
+
+  @Test
+  void aServiceThatIsMarkedNotAvailableGivesAnError() {
+    SrvDriver driver =
+        new SrvDriver(
+            new FixedResolver(new SrvRecord(0, 0, 0, ".")), new RecordingDriver(), new Random(1));
+
+    SQLException e =
+        assertThrows(
+            SQLException.class, () -> driver.connect("jdbc:postgresql+srv://db.test/db", null));
+    assertTrue(e.getMessage().contains("not available"), e.getMessage());
+  }
+
+  @Test
+  void theDriverIsRegisteredWithDriverManager() throws Exception {
+    Class.forName("io.github.heroicode.pgsrv.SrvDriver");
+    assertTrue(
+        DriverManager.getDriver("jdbc:postgresql+srv://db.example.com/db") instanceof SrvDriver);
+  }
+
+  @Test
+  void equalPriorityRecordsAreOrderedByWeightedChance() {
+    List<SrvRecord> records =
+        Arrays.asList(
+            new SrvRecord(10, 90, 5432, "heavy"),
+            new SrvRecord(10, 10, 5432, "light"),
+            new SrvRecord(5, 0, 5432, "first"),
+            new SrvRecord(20, 0, 5432, "last"));
+    Random random = new Random(42);
+    Map<String, Integer> second = new HashMap<String, Integer>();
+    for (int i = 0; i < 10000; i++) {
+      List<SrvRecord> ordered = SrvRecord.order(new ArrayList<SrvRecord>(records), random);
+      assertEquals(4, ordered.size());
+      assertEquals("first", ordered.get(0).getTarget());
+      assertEquals("last", ordered.get(3).getTarget());
+      second.merge(ordered.get(1).getTarget(), 1, Integer::sum);
+    }
+    int heavy = second.get("heavy");
+    assertTrue(heavy > 8700 && heavy < 9300, "heavy was tried first " + heavy + " times of 10000");
+  }
+
+  @Test
+  void recordDataIsParsed() {
+    SrvRecord record = SrvRecord.parse("10 60 5432 db1.example.com.");
+    assertEquals(10, record.getPriority());
+    assertEquals(60, record.getWeight());
+    assertEquals(5432, record.getPort());
+    assertEquals("db1.example.com", record.getTarget());
+    assertThrows(IllegalArgumentException.class, () -> SrvRecord.parse("10 60 db1.example.com."));
+  }
+}
