@@ -63,6 +63,10 @@ import java.util.logging.Logger;
 public final class SrvDriver implements Driver {
   private static final String POSTGRES_DRIVER_CLASS = "org.postgresql.Driver";
 
+  // Must agree with the version in pom.xml. A test fails if they do not.
+  private static final int MAJOR_VERSION = 0;
+  private static final int MINOR_VERSION = 2;
+
   static {
     try {
       DriverManager.registerDriver(new SrvDriver());
@@ -188,12 +192,12 @@ public final class SrvDriver implements Driver {
 
   @Override
   public int getMajorVersion() {
-    return 0;
+    return MAJOR_VERSION;
   }
 
   @Override
   public int getMinorVersion() {
-    return 1;
+    return MINOR_VERSION;
   }
 
   @Override

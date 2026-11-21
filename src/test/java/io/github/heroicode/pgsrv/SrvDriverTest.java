@@ -537,6 +537,17 @@ class SrvDriverTest {
   }
 
   @Test
+  void theVersionNumbersAgreeWithTheProjectVersion() {
+    String version = System.getProperty("pgjdbcSrv.version");
+    org.junit.jupiter.api.Assumptions.assumeTrue(version != null, "not run by Maven");
+    SrvDriver driver = new SrvDriver();
+
+    assertTrue(
+        version.startsWith(driver.getMajorVersion() + "." + driver.getMinorVersion() + "."),
+        "pom.xml has " + version);
+  }
+
+  @Test
   void recordDataIsParsed() {
     SrvRecord record = SrvRecord.parse("10 60 5432 db1.example.com.");
     assertEquals(10, record.getPriority());
