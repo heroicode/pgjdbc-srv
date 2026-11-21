@@ -367,6 +367,30 @@ class SrvDriverTest {
   }
 
   @Test
+  void aCustomResolverGetsOnlyAValidDnsServer() throws SQLException {
+    FixedResolver resolver = new FixedResolver(new SrvRecord(1, 0, 5432, "pg1.example.com"));
+    SrvDriver driver = new SrvDriver(resolver, new RecordingDriver(), new Random(1));
+
+    SQLException e =
+        assertThrows(
+            SQLException.class,
+            () ->
+                driver.resolve(
+                    "jdbc:postgresql+srv://db.example.com/db?srvDnsServer=evil.com/example.org",
+                    null));
+    assertTrue(e.getMessage().contains("srvDnsServer"), e.getMessage());
+    assertNull(resolver.askedName, "the resolver was called");
+
+    Properties info = new Properties();
+    info.setProperty("srvDnsServer", "10.0.0.53 10.0.0.54");
+    assertThrows(
+        SQLException.class, () -> driver.resolve("jdbc:postgresql+srv://db.example.com/db", info));
+
+    driver.resolve("jdbc:postgresql+srv://db.example.com/db?srvDnsServer=[fe80::1]:53", null);
+    assertEquals("[fe80::1]:53", resolver.askedServer);
+  }
+
+  @Test
   void otherUrlsAreNotAccepted() throws SQLException {
     SrvDriver driver = new SrvDriver(new FixedResolver(), new RecordingDriver(), new Random(1));
 

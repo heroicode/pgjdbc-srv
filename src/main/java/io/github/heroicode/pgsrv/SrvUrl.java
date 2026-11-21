@@ -128,6 +128,10 @@ final class SrvUrl {
     if (dnsServer != null && dnsServer.isEmpty()) {
       dnsServer = null;
     }
+    // Examined here, and not only in DnsSrvResolver, so that each SrvResolver gets a safe value.
+    if (dnsServer != null && !DnsSrvResolver.isDnsServer(dnsServer)) {
+      throw invalid(DNS_SERVER_PROPERTY + " must be host or host:port");
+    }
 
     // A name that already starts with a "_service" label is used as it is.
     String srvName;
