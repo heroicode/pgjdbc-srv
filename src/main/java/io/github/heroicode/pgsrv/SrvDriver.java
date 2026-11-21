@@ -19,8 +19,44 @@ import java.util.logging.Logger;
  * RFC 2782 order, and connects through the PostgreSQL driver with the equivalent multi-host URL
  * {@code jdbc:postgresql://target1:port1,target2:port2/database?parameters}.
  *
- * <p>All SRV targets must be in the parent domain of {@code name}, or in the domain that the
- * {@code srvTargetDomain} parameter gives. If a target is not, the connection attempt fails.
+ * <pre>{@code
+ * Connection connection = DriverManager.getConnection(
+ *     "jdbc:postgresql+srv://db.example.com/orders?sslmode=verify-full", "user", "password");
+ * }</pre>
+ *
+ * <h2>Parameters</h2>
+ *
+ * <p>These parameters belong to this driver. Give them in the URL or in the connection
+ * properties. If a parameter is in both, the URL is used. All other parameters and properties are
+ * passed on to the PostgreSQL driver.
+ *
+ * <dl>
+ *   <dt>{@code srvServiceName}
+ *   <dd>Service label of the SRV name. The lookup is for {@code _<srvServiceName>._tcp.<name>}.
+ *       Default: {@code postgresql}. If {@code name} in the URL starts with an underscore, it is
+ *       looked up as it is and this parameter is not used.
+ *   <dt>{@code srvDnsServer}
+ *   <dd>DNS server to query, as {@code host} or {@code host:port}. Default: the DNS servers of
+ *       the operating system.
+ *   <dt>{@code srvTargetDomain}
+ *   <dd>Domain that all SRV targets must be in. Default: {@code name} without its first label, or
+ *       {@code name} itself if it has fewer than three labels. For {@code db.example.com} the
+ *       default is {@code example.com}. {@code srvAllowedHostsSuffix} is another name for this
+ *       parameter.
+ * </dl>
+ *
+ * <h2>Security</h2>
+ *
+ * <p>DNS chooses the hosts, and the PostgreSQL driver checks the server certificate against the
+ * SRV target, not against {@code name}. For that reason the connection attempt fails with
+ * SQLSTATE {@code 08001} if a target is outside the target domain or is not a plain host name.
+ * Use {@code sslmode=verify-full}, and set {@code srvTargetDomain} if other parties can get host
+ * names in the default domain.
+ *
+ * <h2>Failures</h2>
+ *
+ * <p>A failed DNS lookup, or a name that has no SRV records, gives an {@link SQLException} with
+ * SQLSTATE {@code 08001}. The lookup is done again for each new connection and is not cached.
  */
 public final class SrvDriver implements Driver {
   private static final String POSTGRES_DRIVER_CLASS = "org.postgresql.Driver";
@@ -37,6 +73,7 @@ public final class SrvDriver implements Driver {
   private final Random random;
   private volatile Driver delegate;
 
+  /** Creates a driver that uses the DNS client of the JDK and the PostgreSQL JDBC driver. */
   public SrvDriver() {
     this(new DnsSrvResolver(), null, new Random());
   }
@@ -61,7 +98,16 @@ public final class SrvDriver implements Driver {
     return delegate().connect(resolveUrl(srvUrl), srvUrl.getProperties());
   }
 
-  /** Returns the multi-host PostgreSQL URL that the given SRV URL resolves to at this moment. */
+  /**
+   * Does the DNS lookup for an SRV URL and returns the result, without making a connection. Use
+   * it to see which hosts a URL gives at this moment.
+   *
+   * @param url a {@code jdbc:postgresql+srv://} URL
+   * @param info connection properties, or null
+   * @return the multi-host {@code jdbc:postgresql://} URL that {@link #connect} passes to the
+   *     PostgreSQL driver
+   * @throws SQLException if the URL is not valid, the lookup fails, or a target is not permitted
+   */
   public String resolve(String url, Properties info) throws SQLException {
     if (!acceptsURL(url)) {
       throw new SQLException("Not a " + SrvUrl.PREFIX + " URL: " + url, "08001");
