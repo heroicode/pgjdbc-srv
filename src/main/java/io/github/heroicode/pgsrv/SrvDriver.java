@@ -43,7 +43,8 @@ import java.util.logging.Logger;
  *   <dd>Domain that all SRV targets must be in. Default: {@code name} without its first label, or
  *       {@code name} itself if it has fewer than three labels. For {@code db.example.com} the
  *       default is {@code example.com}. {@code srvAllowedHostsSuffix} is another name for this
- *       parameter.
+ *       parameter. A value in the URL cannot replace a value in the connection properties: if
+ *       the parameter is given more than one time, the values must be the same.
  * </dl>
  *
  * <h2>Security</h2>

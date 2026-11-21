@@ -73,7 +73,8 @@ _postgresql._tcp.db.example.com. 60 IN SRV 20 0 5432 pg2.example.com.
 
 ## Parameters
 
-Give these in the URL or in the connection properties. The URL wins.
+Give these in the URL or in the connection properties. The URL wins, except for
+`srvTargetDomain` (see Security).
 
 | Parameter        | Default      | Meaning                                                              |
 |------------------|--------------|----------------------------------------------------------------------|
@@ -100,7 +101,10 @@ To limit this, the driver refuses to connect if an SRV target is outside the exp
 - To use targets in a different domain, give that domain in `srvTargetDomain`, for example
   `?srvTargetDomain=db.cloud-provider.example`.
 - `srvAllowedHostsSuffix`, the name that MongoDB drivers use, is accepted as another name for
-  `srvTargetDomain`. If you give both, they must have the same value.
+  `srvTargetDomain`.
+- A value of `srvTargetDomain` in the URL cannot replace or remove a value in the connection
+  properties. If you give the parameter in more than one place, or with both names, the values
+  must be the same. An empty value is an error.
 
 A forged answer can still point at another host in the same domain. Thus:
 

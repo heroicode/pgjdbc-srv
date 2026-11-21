@@ -11,8 +11,9 @@ import java.util.Properties;
  * A parsed {@code jdbc:postgresql+srv://name[/database][?parameters]} URL.
  *
  * <p>The parameters {@code srvServiceName}, {@code srvDnsServer} and {@code srvTargetDomain}
- * belong to this wrapper. They can be given in the URL or in the connection properties (the URL
- * wins), and are not passed on to the PostgreSQL driver. {@code srvAllowedHostsSuffix}, the name
+ * belong to this wrapper. They can be given in the URL or in the connection properties, and are
+ * not passed on to the PostgreSQL driver. The URL wins, except for {@code srvTargetDomain}: its
+ * values must all be the same. {@code srvAllowedHostsSuffix}, the name
  * that MongoDB drivers use, is accepted as another name for {@code srvTargetDomain}.
  */
 final class SrvUrl {
@@ -91,13 +92,8 @@ final class SrvUrl {
     }
     String serviceName = (String) properties.remove(SERVICE_NAME_PROPERTY);
     String dnsServer = (String) properties.remove(DNS_SERVER_PROPERTY);
-    String targetDomain =
-        sameTargetDomain(
-            url,
-            (String) properties.remove(TARGET_DOMAIN_PROPERTY),
-            (String) properties.remove(TARGET_DOMAIN_ALIAS));
-    String urlTargetDomain = null;
-    String urlTargetDomainAlias = null;
+    String targetDomain = addTargetDomain(null, (String) properties.remove(TARGET_DOMAIN_PROPERTY));
+    targetDomain = addTargetDomain(targetDomain, (String) properties.remove(TARGET_DOMAIN_ALIAS));
 
     // All other URL parameters are passed on as properties, not in the URL. The PostgreSQL
     // driver can put the URL that it gets in its error messages, and a parameter can be a
@@ -118,18 +114,13 @@ final class SrvUrl {
         serviceName = value;
       } else if (DNS_SERVER_PROPERTY.equals(name)) {
         dnsServer = value;
-      } else if (TARGET_DOMAIN_PROPERTY.equals(name)) {
-        urlTargetDomain = value;
-      } else if (TARGET_DOMAIN_ALIAS.equals(name)) {
-        urlTargetDomainAlias = value;
+      } else if (TARGET_DOMAIN_PROPERTY.equals(name) || TARGET_DOMAIN_ALIAS.equals(name)) {
+        targetDomain = addTargetDomain(targetDomain, value);
       } else {
         properties.setProperty(name, value);
       }
     }
 
-    if (urlTargetDomain != null || urlTargetDomainAlias != null) {
-      targetDomain = sameTargetDomain(url, urlTargetDomain, urlTargetDomainAlias);
-    }
     boolean serviceNameGiven = serviceName != null && !serviceName.isEmpty();
     if (!serviceNameGiven) {
       serviceName = DEFAULT_SERVICE_NAME;
@@ -154,15 +145,9 @@ final class SrvUrl {
       srvName = "_" + serviceName + "._tcp." + host;
     }
 
-    if (targetDomain == null || targetDomain.isEmpty()) {
-      targetDomain = defaultTargetDomain(host);
-    } else {
-      targetDomain = stripDots(targetDomain);
-      if (!SrvRecord.isHostName(targetDomain)) {
-        throw invalid(TARGET_DOMAIN_PROPERTY + " is not a valid domain name");
-      }
+    if (targetDomain == null) {
+      targetDomain = defaultTargetDomain(host).toLowerCase(Locale.ROOT);
     }
-    targetDomain = targetDomain.toLowerCase(Locale.ROOT);
 
     return new SrvUrl(srvName, dnsServer, targetDomain, database, properties);
   }
@@ -182,17 +167,31 @@ final class SrvUrl {
     return hasThreeLabels ? name.substring(firstDot + 1) : name;
   }
 
-  /** Returns the value that was given. It is an error to give the two names different values. */
-  private static String sameTargetDomain(String url, String value, String aliasValue)
-      throws SQLException {
+  /**
+   * Adds one given value of the target domain. The target domain is a security limit, so a value
+   * in one place cannot replace or remove a value in another place: all values must be the same.
+   *
+   * @param current the value from the places that were read before, or null
+   * @param value the value from this place, or null if it is not given there
+   * @return the target domain in lower case without dots at the ends, or null if there is none
+   */
+  private static String addTargetDomain(String current, String value) throws SQLException {
     if (value == null) {
-      return aliasValue;
+      return current;
     }
-    if (aliasValue != null
-        && !stripDots(value).equalsIgnoreCase(stripDots(aliasValue))) {
-      throw invalid(TARGET_DOMAIN_PROPERTY + " and " + TARGET_DOMAIN_ALIAS + " have different values");
+    String domain = stripDots(value).toLowerCase(Locale.ROOT);
+    if (!SrvRecord.isHostName(domain)) {
+      throw invalid(TARGET_DOMAIN_PROPERTY + " is empty or is not a valid domain name");
     }
-    return value;
+    if (current != null && !current.equals(domain)) {
+      throw invalid(
+          TARGET_DOMAIN_PROPERTY
+              + " is given more than one time with different values. The URL, the connection"
+              + " properties and "
+              + TARGET_DOMAIN_ALIAS
+              + " must agree");
+    }
+    return domain;
   }
 
   private static String stripDots(String name) {
