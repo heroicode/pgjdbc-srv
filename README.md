@@ -49,7 +49,7 @@ jdbc:postgresql+srv://db.example.com/orders?sslmode=require
 For each new connection the driver:
 
 1. Looks up the SRV records of `_postgresql._tcp.db.example.com`.
-2. Puts them in RFC 2782 order: lowest priority value first, weighted random order among
+2. Puts them in [RFC 2782](https://datatracker.ietf.org/doc/html/rfc2782) order: lowest priority value first, weighted random order among
    records with the same priority.
 3. Connects through pgjdbc with the equivalent multi-host URL, for example
    `jdbc:postgresql://pg1.example.com:5432,pg2.example.com:5432/orders?sslmode=require`.
