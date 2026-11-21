@@ -149,6 +149,62 @@ class SrvDriverTest {
     assertEquals("_pg._tcp.example.com", resolver.askedName);
   }
 
+  private static String resolve(String url, String... targets) throws SQLException {
+    SrvRecord[] records = new SrvRecord[targets.length];
+    for (int i = 0; i < targets.length; i++) {
+      records[i] = new SrvRecord(i, 0, 5432, targets[i]);
+    }
+    return new SrvDriver(new FixedResolver(records), new RecordingDriver(), new Random(1))
+        .resolve(url, null);
+  }
+
+  @Test
+  void targetsMustBeInTheParentDomainOfTheName() throws SQLException {
+    String url = "jdbc:postgresql+srv://db.example.com/orders?sslmode=verify-full";
+
+    assertEquals(
+        "jdbc:postgresql://pg1.example.com:5432,a.b.EXAMPLE.com:5432,example.com:5432/orders"
+            + "?sslmode=verify-full",
+        resolve(url, "pg1.example.com", "a.b.EXAMPLE.com", "example.com"));
+
+    for (String outside :
+        new String[] {"pg.attacker.net", "example.com.attacker.net", "notexample.com", "com"}) {
+      SQLException e =
+          assertThrows(SQLException.class, () -> resolve(url, "pg1.example.com", outside));
+      assertEquals("08001", e.getSQLState());
+      assertTrue(e.getMessage().contains("srvTargetDomain"), e.getMessage());
+    }
+  }
+
+  @Test
+  void aNameWithFewerThanThreeLabelsIsItsOwnTargetDomain() throws SQLException {
+    assertEquals(
+        "jdbc:postgresql://pg1.example.com:5432/",
+        resolve("jdbc:postgresql+srv://example.com", "pg1.example.com"));
+    assertThrows(
+        SQLException.class, () -> resolve("jdbc:postgresql+srv://example.com", "pg1.other.com"));
+    // The labels of a full SRV name are not part of the domain.
+    assertThrows(
+        SQLException.class,
+        () -> resolve("jdbc:postgresql+srv://_pg._tcp.example.com", "pg1.tcp.attacker.com"));
+    assertEquals(
+        "jdbc:postgresql://pg1.example.com:5432/",
+        resolve("jdbc:postgresql+srv://_pg._tcp.db.example.com", "pg1.example.com"));
+  }
+
+  @Test
+  void theTargetDomainCanBeGiven() throws SQLException {
+    String url = "jdbc:postgresql+srv://db.example.com/orders?srvTargetDomain=.Cloud.Example.NET.";
+
+    assertEquals(
+        "jdbc:postgresql://pg1.cloud.example.net:5432/orders",
+        resolve(url, "pg1.cloud.example.net"));
+    assertThrows(SQLException.class, () -> resolve(url, "pg1.example.com"));
+    assertThrows(
+        SQLException.class,
+        () -> resolve("jdbc:postgresql+srv://db.example.com/?srvTargetDomain=a/b", "a.b"));
+  }
+
   @Test
   void otherUrlsAreNotAccepted() throws SQLException {
     SrvDriver driver = new SrvDriver(new FixedResolver(), new RecordingDriver(), new Random(1));

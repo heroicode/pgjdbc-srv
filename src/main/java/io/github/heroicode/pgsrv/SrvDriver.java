@@ -18,6 +18,9 @@ import java.util.logging.Logger;
  * each new connection it looks up the SRV records of {@code _postgresql._tcp.name}, puts them in
  * RFC 2782 order, and connects through the PostgreSQL driver with the equivalent multi-host URL
  * {@code jdbc:postgresql://target1:port1,target2:port2/database?parameters}.
+ *
+ * <p>All SRV targets must be in the parent domain of {@code name}, or in the domain that the
+ * {@code srvTargetDomain} parameter gives. If a target is not, the connection attempt fails.
  */
 public final class SrvDriver implements Driver {
   private static final String POSTGRES_DRIVER_CLASS = "org.postgresql.Driver";
@@ -78,6 +81,23 @@ public final class SrvDriver implements Driver {
           "The SRV records of " + srvUrl.getSrvName() + " say that the service is not available",
           "08001");
     }
+    // The PostgreSQL driver checks the server certificate against the SRV target, and DNS chose
+    // that target. A target outside the expected domain must not be used.
+    for (SrvRecord record : usable) {
+      if (!srvUrl.allowsTarget(record.getTarget())) {
+        throw new SQLException(
+            "SRV target "
+                + record.getTarget()
+                + " of "
+                + srvUrl.getSrvName()
+                + " is not in the domain "
+                + srvUrl.getTargetDomain()
+                + ". If this target is correct, set the "
+                + SrvUrl.TARGET_DOMAIN_PROPERTY
+                + " parameter to its domain.",
+            "08001");
+      }
+    }
     return srvUrl.toPostgresUrl(SrvRecord.order(usable, random));
   }
 
@@ -95,7 +115,11 @@ public final class SrvDriver implements Driver {
     DriverPropertyInfo dnsServer = new DriverPropertyInfo(SrvUrl.DNS_SERVER_PROPERTY, null);
     dnsServer.description =
         "DNS server to query, as host or host:port. Default: the servers of the operating system.";
-    return new DriverPropertyInfo[] {serviceName, dnsServer};
+    DriverPropertyInfo targetDomain = new DriverPropertyInfo(SrvUrl.TARGET_DOMAIN_PROPERTY, null);
+    targetDomain.description =
+        "Domain that all SRV targets must be in. Default: the name in the URL without its first"
+            + " label, or the name itself if it has fewer than three labels.";
+    return new DriverPropertyInfo[] {serviceName, dnsServer, targetDomain};
   }
 
   @Override

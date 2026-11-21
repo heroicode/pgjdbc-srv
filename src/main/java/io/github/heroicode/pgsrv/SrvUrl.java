@@ -5,33 +5,42 @@ import java.net.URLDecoder;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Properties;
 
 /**
  * A parsed {@code jdbc:postgresql+srv://name[/database][?parameters]} URL.
  *
- * <p>The parameters {@code srvServiceName} and {@code srvDnsServer} belong to this wrapper. They
- * can be given in the URL or in the connection properties (the URL wins), and are not passed on
- * to the PostgreSQL driver.
+ * <p>The parameters {@code srvServiceName}, {@code srvDnsServer} and {@code srvTargetDomain}
+ * belong to this wrapper. They can be given in the URL or in the connection properties (the URL
+ * wins), and are not passed on to the PostgreSQL driver.
  */
 final class SrvUrl {
   static final String PREFIX = "jdbc:postgresql+srv://";
   static final String SERVICE_NAME_PROPERTY = "srvServiceName";
   static final String DNS_SERVER_PROPERTY = "srvDnsServer";
+  static final String TARGET_DOMAIN_PROPERTY = "srvTargetDomain";
   static final String DEFAULT_SERVICE_NAME = "postgresql";
 
   private static final String INVALID_URL_STATE = "08001";
 
   private final String srvName;
   private final String dnsServer;
+  private final String targetDomain;
   private final String database;
   private final String query;
   private final Properties properties;
 
   private SrvUrl(
-      String srvName, String dnsServer, String database, String query, Properties properties) {
+      String srvName,
+      String dnsServer,
+      String targetDomain,
+      String database,
+      String query,
+      Properties properties) {
     this.srvName = srvName;
     this.dnsServer = dnsServer;
+    this.targetDomain = targetDomain;
     this.database = database;
     this.query = query;
     this.properties = properties;
@@ -81,6 +90,7 @@ final class SrvUrl {
     }
     String serviceName = (String) properties.remove(SERVICE_NAME_PROPERTY);
     String dnsServer = (String) properties.remove(DNS_SERVER_PROPERTY);
+    String targetDomain = (String) properties.remove(TARGET_DOMAIN_PROPERTY);
 
     List<String> passedOn = new ArrayList<String>();
     for (String parameter : rawQuery.split("&")) {
@@ -94,6 +104,8 @@ final class SrvUrl {
         serviceName = value;
       } else if (DNS_SERVER_PROPERTY.equals(name)) {
         dnsServer = value;
+      } else if (TARGET_DOMAIN_PROPERTY.equals(name)) {
+        targetDomain = value;
       } else {
         passedOn.add(parameter);
       }
@@ -108,7 +120,50 @@ final class SrvUrl {
 
     // A name that already starts with a "_service" label is used as it is.
     String srvName = host.startsWith("_") ? host : "_" + serviceName + "._tcp." + host;
-    return new SrvUrl(srvName, dnsServer, database, String.join("&", passedOn), properties);
+
+    if (targetDomain == null || targetDomain.isEmpty()) {
+      targetDomain = defaultTargetDomain(host);
+    } else {
+      targetDomain = stripDots(targetDomain);
+      if (!SrvRecord.isHostName(targetDomain)) {
+        throw invalid(url, TARGET_DOMAIN_PROPERTY + " is not a valid domain name");
+      }
+    }
+    targetDomain = targetDomain.toLowerCase(Locale.ROOT);
+
+    return new SrvUrl(
+        srvName, dnsServer, targetDomain, database, String.join("&", passedOn), properties);
+  }
+
+  /**
+   * The domain that SRV targets must be in when the URL does not give one: the DNS name without
+   * its first label, or the DNS name itself if it has fewer than three labels. Labels of an SRV
+   * name ("_service", "_tcp") are not counted.
+   */
+  private static String defaultTargetDomain(String host) {
+    String name = host;
+    while (name.startsWith("_") && name.indexOf('.') >= 0) {
+      name = name.substring(name.indexOf('.') + 1);
+    }
+    int firstDot = name.indexOf('.');
+    boolean hasThreeLabels = firstDot >= 0 && name.indexOf('.', firstDot + 1) >= 0;
+    return hasThreeLabels ? name.substring(firstDot + 1) : name;
+  }
+
+  private static String stripDots(String name) {
+    int start = name.startsWith(".") ? 1 : 0;
+    int end = name.endsWith(".") && name.length() > start ? name.length() - 1 : name.length();
+    return name.substring(start, end);
+  }
+
+  /** True if the SRV target is the target domain or a name below it. */
+  boolean allowsTarget(String target) {
+    String name = target.toLowerCase(Locale.ROOT);
+    return name.equals(targetDomain) || name.endsWith("." + targetDomain);
+  }
+
+  String getTargetDomain() {
+    return targetDomain;
   }
 
   /** Builds the multi-host URL for the PostgreSQL driver. The driver tries the hosts in order. */

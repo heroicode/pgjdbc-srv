@@ -76,9 +76,37 @@ Give these in the URL or in the connection properties. The URL wins.
 |------------------|--------------|----------------------------------------------------------------------|
 | `srvServiceName` | `postgresql` | Service label. The lookup is for `_<srvServiceName>._tcp.<name>`.    |
 | `srvDnsServer`   | OS resolver  | DNS server to query, as `host` or `host:port`.                       |
+| `srvTargetDomain`| see Security | Domain that all SRV targets must be in.                              |
 
 If the name in the URL already starts with `_` (for example
 `jdbc:postgresql+srv://_pg._tcp.example.com/orders`), it is looked up as it is.
+
+## Security
+
+DNS chooses the hosts that the driver connects to, and DNS answers can be forged. pgjdbc checks
+the server certificate against the SRV target, not against the name in your URL. This means
+that `sslmode=verify-full` is only as strong as the path to your DNS server.
+
+To limit this, the driver refuses to connect if an SRV target is outside the expected domain:
+
+- By default, the expected domain is the name in the URL without its first label. For
+  `jdbc:postgresql+srv://db.example.com/orders`, all targets must be `example.com` or a name
+  below it.
+- If the name has fewer than three labels (`example.com`), the targets must be below that name.
+- To use targets in a different domain, give that domain in `srvTargetDomain`, for example
+  `?srvTargetDomain=db.cloud-provider.example`.
+
+A forged answer can still point at another host in the same domain. Thus:
+
+- Use `sslmode=verify-full`. Without it, a forged answer can send your credentials to any host
+  in the domain.
+- Do not let the expected domain be one that other parties can get names and certificates in,
+  such as `co.uk` or a shared hosting domain. The default for `db.co.uk` is `co.uk`. In such a
+  case, set `srvTargetDomain`.
+- Where you can, use a resolver that validates DNSSEC, and sign the zone.
+
+The driver also rejects SRV targets that are not plain host names, so a DNS answer cannot add
+or change connection parameters.
 
 ## Limits
 

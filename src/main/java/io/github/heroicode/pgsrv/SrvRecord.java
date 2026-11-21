@@ -38,9 +38,7 @@ public final class SrvRecord {
     if (".".equals(target)) {
       checkRange("port", port, 0);
     } else {
-      if (target == null
-          || target.length() > MAX_HOST_NAME_LENGTH
-          || !HOST_NAME.matcher(target).matches()) {
+      if (!isHostName(target)) {
         throw new IllegalArgumentException("SRV target is not a valid host name: \"" + target + "\"");
       }
       checkRange("port", port, 1);
@@ -49,6 +47,13 @@ public final class SrvRecord {
     this.weight = weight;
     this.port = port;
     this.target = target;
+  }
+
+  /** True for dot-separated labels of letters, digits, hyphens and underscores. */
+  static boolean isHostName(String name) {
+    return name != null
+        && name.length() <= MAX_HOST_NAME_LENGTH
+        && HOST_NAME.matcher(name).matches();
   }
 
   private static void checkRange(String field, int value, int min) {
