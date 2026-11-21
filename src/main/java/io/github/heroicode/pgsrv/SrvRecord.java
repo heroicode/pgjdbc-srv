@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
  * of a JDBC URL. For that reason a record can only be made from a plain host name and from
  * numbers that are in the range of the DNS record format.
  */
+@SuppressWarnings("doclint:missing")
 public final class SrvRecord {
   private static final int MAX_UNSIGNED_16_BIT = 65535;
   private static final int MAX_HOST_NAME_LENGTH = 253;

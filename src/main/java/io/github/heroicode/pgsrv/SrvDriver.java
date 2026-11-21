@@ -79,6 +79,9 @@ public final class SrvDriver implements Driver {
   }
 
   /**
+   * Creates a driver with a different source of SRV records or a different driver to connect
+   * through.
+   *
    * @param resolver the source of the SRV records
    * @param delegate the driver that makes the connection, or null to load the PostgreSQL driver
    * @param random the source of randomness for the weighted order of equal-priority records

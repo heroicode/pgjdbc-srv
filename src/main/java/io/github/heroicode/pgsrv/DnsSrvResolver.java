@@ -14,6 +14,7 @@ import javax.naming.directory.DirContext;
 import javax.naming.directory.InitialDirContext;
 
 /** Resolves SRV records with the DNS provider that is built into the JDK (JNDI). */
+@SuppressWarnings("doclint:missing")
 public final class DnsSrvResolver implements SrvResolver {
   /** SQLSTATE: the client is unable to establish the connection. */
   static final String CONNECTION_UNABLE_TO_CONNECT = "08001";

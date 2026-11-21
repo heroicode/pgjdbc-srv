@@ -16,7 +16,8 @@ jobs:
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: 17
+          # 18 or later: javadoc ignores @SuppressWarnings("doclint:missing") before that.
+          java-version: 21
           cache: maven
           server-id: central
           server-username-env-var: CENTRAL_TOKEN_USERNAME

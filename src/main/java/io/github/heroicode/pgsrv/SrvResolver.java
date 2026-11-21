@@ -6,6 +6,8 @@ import java.util.List;
 /** Looks up the SRV records of a DNS name. */
 public interface SrvResolver {
   /**
+   * Returns the SRV records of a name.
+   *
    * @param srvName the full SRV name, for example {@code _postgresql._tcp.db.example.com}
    * @param dnsServer {@code host} or {@code host:port} of the DNS server to query, or null to use
    *     the DNS servers of the operating system
