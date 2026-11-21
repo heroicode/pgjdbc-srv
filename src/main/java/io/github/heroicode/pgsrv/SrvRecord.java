@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
@@ -162,6 +163,31 @@ public final class SrvRecord {
   /** A target of "." means that the service is explicitly not available at this domain. */
   boolean isUnavailableMarker() {
     return ".".equals(target);
+  }
+
+  /** Records are equal if all four fields are equal. The case of the target is ignored. */
+  @Override
+  public boolean equals(Object other) {
+    if (this == other) {
+      return true;
+    }
+    if (!(other instanceof SrvRecord)) {
+      return false;
+    }
+    SrvRecord that = (SrvRecord) other;
+    return priority == that.priority
+        && weight == that.weight
+        && port == that.port
+        && target.equalsIgnoreCase(that.target);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = priority;
+    result = 31 * result + weight;
+    result = 31 * result + port;
+    result = 31 * result + target.toLowerCase(Locale.ROOT).hashCode();
+    return result;
   }
 
   @Override

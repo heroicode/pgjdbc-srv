@@ -608,6 +608,20 @@ class SrvDriverTest {
   }
 
   @Test
+  void recordsWithTheSameFieldsAreEqual() {
+    SrvRecord record = new SrvRecord(10, 60, 5432, "db1.example.com");
+
+    assertEquals(record, SrvRecord.parse("10 60 5432 DB1.Example.COM."));
+    assertEquals(record.hashCode(), SrvRecord.parse("10 60 5432 DB1.Example.COM.").hashCode());
+    assertFalse(record.equals(new SrvRecord(11, 60, 5432, "db1.example.com")));
+    assertFalse(record.equals(new SrvRecord(10, 61, 5432, "db1.example.com")));
+    assertFalse(record.equals(new SrvRecord(10, 60, 5433, "db1.example.com")));
+    assertFalse(record.equals(new SrvRecord(10, 60, 5432, "db2.example.com")));
+    assertFalse(record.equals(null));
+    assertFalse(record.equals("10 60 5432 db1.example.com"));
+  }
+
+  @Test
   void recordDataIsParsed() {
     SrvRecord record = SrvRecord.parse("10 60 5432 db1.example.com.");
     assertEquals(10, record.getPriority());
