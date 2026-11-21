@@ -22,20 +22,20 @@ Maven:
 <dependency>
   <groupId>io.github.heroicode</groupId>
   <artifactId>pgjdbc-srv</artifactId>
-  <version>0.2.0</version>
+  <version>0.2.1</version>
 </dependency>
 ```
 
 Gradle (Kotlin DSL):
 
 ```kotlin
-implementation("io.github.heroicode:pgjdbc-srv:0.2.0")
+implementation("io.github.heroicode:pgjdbc-srv:0.2.1")
 ```
 
 Gradle (Groovy DSL):
 
 ```groovy
-implementation 'io.github.heroicode:pgjdbc-srv:0.2.0'
+implementation 'io.github.heroicode:pgjdbc-srv:0.2.1'
 ```
 
 Do not use version 0.1.0. It has security defects that 0.2.0 corrects: a forged DNS answer
