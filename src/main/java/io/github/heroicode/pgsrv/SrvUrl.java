@@ -103,12 +103,13 @@ final class SrvUrl {
         continue;
       }
       int equals = parameter.indexOf('=');
-      String name = equals < 0 ? parameter : parameter.substring(0, equals);
+      String name;
       String value;
       try {
+        name = decode(equals < 0 ? parameter : parameter.substring(0, equals));
         value = equals < 0 ? "" : decode(parameter.substring(equals + 1));
       } catch (IllegalArgumentException e) {
-        throw invalid("the value of a URL parameter has a percent-escape that is not valid");
+        throw invalid("a URL parameter has a percent-escape that is not valid");
       }
       if (SERVICE_NAME_PROPERTY.equals(name)) {
         serviceName = value;

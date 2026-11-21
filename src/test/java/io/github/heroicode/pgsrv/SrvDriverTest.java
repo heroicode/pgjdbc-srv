@@ -337,6 +337,30 @@ class SrvDriverTest {
   }
 
   @Test
+  void parameterNamesArePercentDecoded() throws SQLException {
+    RecordingDriver delegate = new RecordingDriver();
+    SrvDriver driver =
+        new SrvDriver(
+            new FixedResolver(new SrvRecord(1, 0, 5432, "pg1.example.net")),
+            delegate,
+            new Random(1));
+
+    // "ssl%6Dode" is "sslmode", and "srv%54argetDomain" is "srvTargetDomain".
+    driver.connect(
+        "jdbc:postgresql+srv://db.example.com/orders"
+            + "?ssl%6Dode=verify-full&srv%54argetDomain=example.net",
+        null);
+
+    assertEquals("verify-full", delegate.info.getProperty("sslmode"));
+    assertFalse(delegate.info.containsKey("ssl%6Dode"));
+    assertFalse(delegate.info.containsKey("srvTargetDomain"));
+    assertEquals("jdbc:postgresql://pg1.example.net:5432/orders", delegate.url);
+    assertThrows(
+        SQLException.class,
+        () -> driver.connect("jdbc:postgresql+srv://db.example.com/orders?ssl%ZZ=1", null));
+  }
+
+  @Test
   void theUrlCannotReplaceOrRemoveATargetDomainFromTheProperties() {
     SrvDriver driver =
         new SrvDriver(
