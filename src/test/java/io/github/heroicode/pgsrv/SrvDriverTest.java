@@ -520,6 +520,66 @@ class SrvDriverTest {
     assertTrue(heavy > 8700 && heavy < 9300, "heavy was tried first " + heavy + " times of 10000");
   }
 
+  /** Counts how many times of 10,000 each target is the first one in the order. */
+  private static Map<String, Integer> firstOf10000(int... weights) {
+    List<SrvRecord> records = new ArrayList<SrvRecord>();
+    for (int i = 0; i < weights.length; i++) {
+      records.add(new SrvRecord(10, weights[i], 5432, "t" + i));
+    }
+    Random random = new Random(2782);
+    Map<String, Integer> first = new HashMap<String, Integer>();
+    for (int i = 0; i < 10000; i++) {
+      List<SrvRecord> ordered = SrvRecord.order(new ArrayList<SrvRecord>(records), random);
+      assertEquals(weights.length, ordered.size());
+      first.merge(ordered.get(0).getTarget(), 1, Integer::sum);
+    }
+    return first;
+  }
+
+  private static void assertNear(int expected, Integer actual, String what) {
+    int count = actual == null ? 0 : actual;
+    assertTrue(Math.abs(count - expected) <= 250, what + " was first " + count + " times of 10000");
+  }
+
+  @Test
+  void recordsOfWeightZeroHaveAnEqualChance() {
+    Map<String, Integer> first = firstOf10000(0, 0);
+    assertNear(5000, first.get("t0"), "t0");
+    assertNear(5000, first.get("t1"), "t1");
+
+    first = firstOf10000(0, 0, 0, 0);
+    for (int i = 0; i < 4; i++) {
+      assertNear(2500, first.get("t" + i), "t" + i);
+    }
+  }
+
+  @Test
+  void theChanceToBeFirstIsInProportionToTheWeight() {
+    Map<String, Integer> first = firstOf10000(1, 1);
+    assertNear(5000, first.get("t0"), "t0");
+    assertNear(5000, first.get("t1"), "t1");
+
+    first = firstOf10000(1, 3);
+    assertNear(2500, first.get("t0"), "t0");
+    assertNear(7500, first.get("t1"), "t1");
+
+    first = firstOf10000(3, 1, 4, 2);
+    assertNear(3000, first.get("t0"), "t0");
+    assertNear(1000, first.get("t1"), "t1");
+    assertNear(4000, first.get("t2"), "t2");
+    assertNear(2000, first.get("t3"), "t3");
+  }
+
+  @Test
+  void recordsOfWeightZeroHaveASmallEqualChanceAmongLargerWeights() {
+    // One chance in 11 that a record of weight 0 is first, divided between the two of them.
+    Map<String, Integer> first = firstOf10000(0, 0, 10);
+    assertNear(455, first.get("t0"), "t0");
+    assertNear(455, first.get("t1"), "t1");
+    assertNear(9090, first.get("t2"), "t2");
+    assertTrue(first.get("t0") > 200 && first.get("t1") > 200, first.toString());
+  }
+
   @Test
   void aSumOfWeightsLargerThanAnIntIsPermitted() {
     // 33,000 records of the largest weight have a sum above Integer.MAX_VALUE.

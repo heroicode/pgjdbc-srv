@@ -2,6 +2,7 @@ package io.github.heroicode.pgsrv;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -90,7 +91,12 @@ public final class SrvRecord {
 
   /**
    * Puts records in the order in which a client must try them (RFC 2782): lowest priority value
-   * first, and a weighted random order among records that have the same priority.
+   * first, and a random order among records that have the same priority.
+   *
+   * <p>Among records of the same priority, the chance that a record is the next one is in
+   * proportion to its weight. Records of weight 0 have an equal chance when all the weights are
+   * 0. When some weights are larger, the records of weight 0 together have one chance in (sum of
+   * the weights + 1) to be the next one.
    */
   public static List<SrvRecord> order(Collection<SrvRecord> records, Random random) {
     Map<Integer, List<SrvRecord>> byPriority = new TreeMap<Integer, List<SrvRecord>>();
@@ -105,7 +111,10 @@ public final class SrvRecord {
 
     List<SrvRecord> ordered = new ArrayList<SrvRecord>(records.size());
     for (List<SrvRecord> pool : byPriority.values()) {
-      // Zero-weight records go first so that they keep a small chance of selection.
+      // RFC 2782 puts the records of weight 0 first, in any order. The order must be random:
+      // the selection below takes the first of them, so a fixed order would always prefer the
+      // record that the DNS server gave first. The sort is stable and keeps the random order.
+      Collections.shuffle(pool, random);
       pool.sort(Comparator.comparingInt(SrvRecord::getWeight));
       // The sum of the weights can be larger than an int holds.
       long total = 0;
@@ -113,7 +122,13 @@ public final class SrvRecord {
         total += record.weight;
       }
       while (!pool.isEmpty()) {
-        long pick = Math.min(total, (long) (random.nextDouble() * (total + 1)));
+        // A number from 0 to the sum selects the first record whose running sum is not less
+        // than the number. The number 0 can only select a record of weight 0. Thus, when there
+        // is no such record, the number starts at 1. If it started at 0, the first record
+        // would get one more chance than its weight gives.
+        long lowest = pool.get(0).weight == 0 ? 0 : 1;
+        long pick = lowest + (long) (random.nextDouble() * (total - lowest + 1));
+        pick = Math.min(pick, total);
         long running = 0;
         for (int i = 0; i < pool.size(); i++) {
           running += pool.get(i).weight;
