@@ -18,16 +18,16 @@ jobs:
         # The JVM that runs the tests. The jar targets Java 8, so 8 must stay in this list.
         java: [8, 11, 17, 21]
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install the JDK that runs the tests
         id: test-jdk
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: ${{ matrix.java }}
       # The build needs JDK 9 or later to compile for Java 8 with the "release" option.
       - name: Install the JDK that runs the build
-        uses: actions/setup-java@v6
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: 21
