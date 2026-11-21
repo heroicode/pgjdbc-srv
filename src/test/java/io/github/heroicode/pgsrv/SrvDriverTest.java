@@ -250,6 +250,42 @@ class SrvDriverTest {
   }
 
   @Test
+  void aServiceNameCannotBeGivenWithAFullSrvName() {
+    SQLException e =
+        assertThrows(
+            SQLException.class,
+            () ->
+                resolve(
+                    "jdbc:postgresql+srv://_pg._tcp.example.com/db?srvServiceName=pgbouncer",
+                    "pg1.example.com"));
+    assertTrue(e.getMessage().contains("srvServiceName"), e.getMessage());
+
+    Properties info = new Properties();
+    info.setProperty("srvServiceName", "pgbouncer");
+    SrvDriver driver =
+        new SrvDriver(
+            new FixedResolver(new SrvRecord(1, 0, 5432, "pg1.example.com")),
+            new RecordingDriver(),
+            new Random(1));
+    assertThrows(
+        SQLException.class,
+        () -> driver.resolve("jdbc:postgresql+srv://_pg._tcp.example.com/db", info));
+  }
+
+  @Test
+  void theServiceNameMustBeOneDnsLabel() {
+    for (String serviceName : new String[] {"a.b", "a/b", "a b", "-a", "a@b"}) {
+      assertThrows(
+          SQLException.class,
+          () ->
+              resolve(
+                  "jdbc:postgresql+srv://db.example.com/db?srvServiceName=" + serviceName,
+                  "pg1.example.com"),
+          serviceName);
+    }
+  }
+
+  @Test
   void otherUrlsAreNotAccepted() throws SQLException {
     SrvDriver driver = new SrvDriver(new FixedResolver(), new RecordingDriver(), new Random(1));
 

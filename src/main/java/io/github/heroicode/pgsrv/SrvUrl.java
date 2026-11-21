@@ -127,7 +127,8 @@ final class SrvUrl {
     if (urlTargetDomain != null || urlTargetDomainAlias != null) {
       targetDomain = sameTargetDomain(url, urlTargetDomain, urlTargetDomainAlias);
     }
-    if (serviceName == null || serviceName.isEmpty()) {
+    boolean serviceNameGiven = serviceName != null && !serviceName.isEmpty();
+    if (!serviceNameGiven) {
       serviceName = DEFAULT_SERVICE_NAME;
     }
     if (dnsServer != null && dnsServer.isEmpty()) {
@@ -135,7 +136,22 @@ final class SrvUrl {
     }
 
     // A name that already starts with a "_service" label is used as it is.
-    String srvName = host.startsWith("_") ? host : "_" + serviceName + "._tcp." + host;
+    String srvName;
+    if (host.startsWith("_")) {
+      if (serviceNameGiven) {
+        throw invalid(
+            url,
+            SERVICE_NAME_PROPERTY
+                + " cannot be used with a DNS name that starts with \"_\", because that name"
+                + " already contains the service");
+      }
+      srvName = host;
+    } else {
+      if (serviceName.indexOf('.') >= 0 || !SrvRecord.isHostName(serviceName)) {
+        throw invalid(url, SERVICE_NAME_PROPERTY + " is not a valid DNS label");
+      }
+      srvName = "_" + serviceName + "._tcp." + host;
+    }
 
     if (targetDomain == null || targetDomain.isEmpty()) {
       targetDomain = defaultTargetDomain(host);

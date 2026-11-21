@@ -79,7 +79,8 @@ Give these in the URL or in the connection properties. The URL wins.
 | `srvTargetDomain`| see Security | Domain that all SRV targets must be in.                              |
 
 If the name in the URL already starts with `_` (for example
-`jdbc:postgresql+srv://_pg._tcp.example.com/orders`), it is looked up as it is.
+`jdbc:postgresql+srv://_pg._tcp.example.com/orders`), it is looked up as it is. Such a name
+already contains the service, so it is an error to give `srvServiceName` with it.
 
 ## Security
 

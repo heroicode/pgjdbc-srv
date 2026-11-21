@@ -34,7 +34,7 @@ import java.util.logging.Logger;
  *   <dt>{@code srvServiceName}
  *   <dd>Service label of the SRV name. The lookup is for {@code _<srvServiceName>._tcp.<name>}.
  *       Default: {@code postgresql}. If {@code name} in the URL starts with an underscore, it is
- *       looked up as it is and this parameter is not used.
+ *       looked up as it is and this parameter must not be given.
  *   <dt>{@code srvDnsServer}
  *   <dd>DNS server to query, as {@code host} or {@code host:port}. Default: the DNS servers of
  *       the operating system.
