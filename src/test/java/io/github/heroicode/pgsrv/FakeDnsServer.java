@@ -17,7 +17,7 @@ final class FakeDnsServer implements AutoCloseable {
   private static final int TYPE_SRV = 33;
 
   private final DatagramSocket socket;
-  private final Map<String, List<SrvRecord>> zone = new ConcurrentHashMap<String, List<SrvRecord>>();
+  private final Map<String, List<Answer>> zone = new ConcurrentHashMap<String, List<Answer>>();
   private final Thread thread;
 
   FakeDnsServer() throws IOException {
@@ -33,7 +33,27 @@ final class FakeDnsServer implements AutoCloseable {
   }
 
   void add(String name, SrvRecord record) {
-    zone.computeIfAbsent(name.toLowerCase(), key -> new ArrayList<SrvRecord>()).add(record);
+    addRaw(name, record.getPriority(), record.getWeight(), record.getPort(), record.getTarget());
+  }
+
+  /** Adds an answer without any validation, to serve data that a hostile DNS server could send. */
+  void addRaw(String name, int priority, int weight, int port, String target) {
+    zone.computeIfAbsent(name.toLowerCase(), key -> new ArrayList<Answer>())
+        .add(new Answer(priority, weight, port, target));
+  }
+
+  private static final class Answer {
+    final int priority;
+    final int weight;
+    final int port;
+    final String target;
+
+    Answer(int priority, int weight, int port, String target) {
+      this.priority = priority;
+      this.weight = weight;
+      this.port = port;
+      this.target = target;
+    }
   }
 
   @Override
@@ -72,10 +92,10 @@ final class FakeDnsServer implements AutoCloseable {
     int type = ((query[position] & 0xff) << 8) | (query[position + 1] & 0xff);
     int questionEnd = position + 4;
 
-    List<SrvRecord> records = zone.get(name.toString().toLowerCase());
+    List<Answer> records = zone.get(name.toString().toLowerCase());
     boolean nameExists = records != null;
     if (records == null || type != TYPE_SRV) {
-      records = new ArrayList<SrvRecord>();
+      records = new ArrayList<Answer>();
     }
 
     ByteArrayOutputStream bytes = new ByteArrayOutputStream();
@@ -87,16 +107,16 @@ final class FakeDnsServer implements AutoCloseable {
     out.writeShort(0);
     out.writeShort(0);
     out.write(query, 12, questionEnd - 12);
-    for (SrvRecord record : records) {
-      byte[] target = encodeName(record.getTarget());
+    for (Answer record : records) {
+      byte[] target = encodeName(record.target);
       out.writeShort(0xC00C); // pointer to the question name
       out.writeShort(TYPE_SRV);
       out.writeShort(1); // class IN
       out.writeInt(60); // TTL
       out.writeShort(6 + target.length);
-      out.writeShort(record.getPriority());
-      out.writeShort(record.getWeight());
-      out.writeShort(record.getPort());
+      out.writeShort(record.priority);
+      out.writeShort(record.weight);
+      out.writeShort(record.port);
       out.write(target);
     }
     return bytes.toByteArray();

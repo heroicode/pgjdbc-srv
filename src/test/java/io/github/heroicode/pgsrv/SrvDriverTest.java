@@ -218,4 +218,45 @@ class SrvDriverTest {
     assertEquals("db1.example.com", record.getTarget());
     assertThrows(IllegalArgumentException.class, () -> SrvRecord.parse("10 60 db1.example.com."));
   }
+
+  @Test
+  void aTargetMustBeAPlainHostName() {
+    for (String target :
+        new String[] {
+          "evil.test/db?sslmode=disable&x=",
+          "evil.test?ssl=false",
+          "evil.test&user=mallory",
+          "a.test,b.test",
+          "a.test:1234",
+          "user@a.test",
+          "a.test#x",
+          "a b.test",
+          "a\\.test",
+          "[::1]",
+          "a..test",
+          ".a.test",
+          "-a.test",
+          "a%2Ftest",
+          "",
+        }) {
+      assertThrows(
+          IllegalArgumentException.class, () -> new SrvRecord(1, 1, 5432, target), target);
+    }
+    assertThrows(IllegalArgumentException.class, () -> new SrvRecord(1, 1, 5432, null));
+
+    new SrvRecord(1, 1, 5432, "pg-1.db_2.example.com");
+    new SrvRecord(1, 1, 5432, "localhost");
+    new SrvRecord(1, 1, 5432, "10.0.0.5");
+    new SrvRecord(0, 0, 0, ".");
+  }
+
+  @Test
+  void numbersMustBeInTheRangeOfTheRecordFormat() {
+    assertThrows(IllegalArgumentException.class, () -> new SrvRecord(-1, 1, 5432, "a.test"));
+    assertThrows(IllegalArgumentException.class, () -> new SrvRecord(1, 65536, 5432, "a.test"));
+    assertThrows(IllegalArgumentException.class, () -> new SrvRecord(1, 1, 0, "a.test"));
+    assertThrows(IllegalArgumentException.class, () -> new SrvRecord(1, 1, 65536, "a.test"));
+    assertThrows(IllegalArgumentException.class, () -> SrvRecord.parse("1 1 99999 a.test."));
+    new SrvRecord(65535, 65535, 65535, "a.test");
+  }
 }

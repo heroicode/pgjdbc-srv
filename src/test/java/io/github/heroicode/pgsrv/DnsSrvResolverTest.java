@@ -44,6 +44,29 @@ class DnsSrvResolverTest {
   }
 
   @Test
+  void aTargetThatWouldChangeTheUrlIsRejected() throws Exception {
+    try (FakeDnsServer dns = new FakeDnsServer()) {
+      dns.addRaw(
+          "_postgresql._tcp.db.test",
+          1,
+          0,
+          5432,
+          "evil.attacker.net/orders?sslmode=disable&user=mallory&x=");
+
+      SQLException e =
+          assertThrows(
+              SQLException.class,
+              () ->
+                  new SrvDriver()
+                      .resolve(
+                          "jdbc:postgresql+srv://db.test/orders?sslmode=verify-full&srvDnsServer="
+                              + dns.address(),
+                          null));
+      assertEquals("08001", e.getSQLState());
+    }
+  }
+
+  @Test
   void aNameWithoutSrvRecordsGivesAnError() throws Exception {
     try (FakeDnsServer dns = new FakeDnsServer()) {
       SQLException e =

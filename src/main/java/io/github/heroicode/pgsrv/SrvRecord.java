@@ -7,24 +7,61 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
+import java.util.regex.Pattern;
 
-/** One DNS SRV record (RFC 2782). */
+/**
+ * One DNS SRV record (RFC 2782).
+ *
+ * <p>The values come from DNS, which is not a trusted source, and the target and port become part
+ * of a JDBC URL. For that reason a record can only be made from a plain host name and from
+ * numbers that are in the range of the DNS record format.
+ */
 public final class SrvRecord {
+  private static final int MAX_UNSIGNED_16_BIT = 65535;
+  private static final int MAX_HOST_NAME_LENGTH = 253;
+  private static final String LABEL = "[A-Za-z0-9_]([A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?";
+  private static final Pattern HOST_NAME = Pattern.compile(LABEL + "(\\." + LABEL + ")*");
+
   private final int priority;
   private final int weight;
   private final int port;
   private final String target;
 
+  /**
+   * @param target a host name of letters, digits, hyphens, underscores and dots, or "." alone
+   * @throws IllegalArgumentException if the target is not a plain host name or a number is out of
+   *     range
+   */
   public SrvRecord(int priority, int weight, int port, String target) {
+    checkRange("priority", priority, 0);
+    checkRange("weight", weight, 0);
+    if (".".equals(target)) {
+      checkRange("port", port, 0);
+    } else {
+      if (target == null
+          || target.length() > MAX_HOST_NAME_LENGTH
+          || !HOST_NAME.matcher(target).matches()) {
+        throw new IllegalArgumentException("SRV target is not a valid host name: \"" + target + "\"");
+      }
+      checkRange("port", port, 1);
+    }
     this.priority = priority;
     this.weight = weight;
     this.port = port;
     this.target = target;
   }
 
+  private static void checkRange(String field, int value, int min) {
+    if (value < min || value > MAX_UNSIGNED_16_BIT) {
+      throw new IllegalArgumentException("SRV " + field + " is out of range: " + value);
+    }
+  }
+
   /**
    * Parses the record data in DNS presentation format: {@code "priority weight port target"}.
    * A trailing dot on the target is removed.
+   *
+   * @throws IllegalArgumentException if the data is malformed or the record is not valid
    */
   public static SrvRecord parse(String rdata) {
     String[] parts = rdata.trim().split("\\s+");
