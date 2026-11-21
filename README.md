@@ -22,21 +22,24 @@ Maven:
 <dependency>
   <groupId>io.github.heroicode</groupId>
   <artifactId>pgjdbc-srv</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
 </dependency>
 ```
 
 Gradle (Kotlin DSL):
 
 ```kotlin
-implementation("io.github.heroicode:pgjdbc-srv:0.1.0")
+implementation("io.github.heroicode:pgjdbc-srv:0.2.0")
 ```
 
 Gradle (Groovy DSL):
 
 ```groovy
-implementation 'io.github.heroicode:pgjdbc-srv:0.1.0'
+implementation 'io.github.heroicode:pgjdbc-srv:0.2.0'
 ```
+
+Do not use version 0.1.0. It has security defects that 0.2.0 corrects: a forged DNS answer
+could change the connection parameters, and SRV targets were not limited to a domain.
 
 ## Usage
 
