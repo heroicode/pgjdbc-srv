@@ -74,6 +74,7 @@ public final class SrvDriver implements Driver {
   private final SrvResolver resolver;
   private final Random random;
   private volatile Driver delegate;
+  private volatile boolean notVisibleToOwnLoader;
 
   /** Creates a driver that uses the DNS client of the JDK and the PostgreSQL JDBC driver. */
   public SrvDriver() {
@@ -210,14 +211,19 @@ public final class SrvDriver implements Driver {
     if (driver != null) {
       return driver;
     }
-    ClassLoader own = SrvDriver.class.getClassLoader();
-    driver = loadPostgresDriver(own, Thread.currentThread().getContextClassLoader());
-    // A driver from the context class loader belongs to the caller, for example to one web
-    // application. Only a driver from the class loader of this library is kept.
-    if (driver.getClass().getClassLoader() == own) {
-      delegate = driver;
+    if (!notVisibleToOwnLoader) {
+      try {
+        driver = newPostgresDriver(SrvDriver.class.getClassLoader());
+        delegate = driver;
+        return driver;
+      } catch (ReflectiveOperationException | LinkageError e) {
+        // Remember the result, so that the search is not done again for each connection.
+        notVisibleToOwnLoader = true;
+      }
     }
-    return driver;
+    // A driver from the context class loader belongs to the caller, for example to one web
+    // application. It is not kept, because that would keep the classes of the caller in memory.
+    return loadPostgresDriver(Thread.currentThread().getContextClassLoader(), null);
   }
 
   /**
