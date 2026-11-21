@@ -286,6 +286,25 @@ class SrvDriverTest {
   }
 
   @Test
+  void thePostgresDriverIsLoadedThroughTheContextClassLoaderIfNecessary() throws Exception {
+    // A class loader that cannot see the PostgreSQL driver, as in some containers.
+    ClassLoader empty = new java.net.URLClassLoader(new java.net.URL[0], null);
+    ClassLoader withPostgres = SrvDriverTest.class.getClassLoader();
+
+    assertEquals(
+        "org.postgresql.Driver",
+        SrvDriver.loadPostgresDriver(withPostgres, empty).getClass().getName());
+    assertEquals(
+        "org.postgresql.Driver",
+        SrvDriver.loadPostgresDriver(empty, withPostgres).getClass().getName());
+
+    SQLException e =
+        assertThrows(SQLException.class, () -> SrvDriver.loadPostgresDriver(empty, empty));
+    assertEquals("08001", e.getSQLState());
+    assertThrows(SQLException.class, () -> SrvDriver.loadPostgresDriver(empty, null));
+  }
+
+  @Test
   void otherUrlsAreNotAccepted() throws SQLException {
     SrvDriver driver = new SrvDriver(new FixedResolver(), new RecordingDriver(), new Random(1));
 

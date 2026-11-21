@@ -205,21 +205,49 @@ public final class SrvDriver implements Driver {
 
   private Driver delegate() throws SQLException {
     Driver driver = delegate;
-    if (driver == null) {
-      try {
-        driver =
-            (Driver)
-                Class.forName(POSTGRES_DRIVER_CLASS, true, SrvDriver.class.getClassLoader())
-                    .getDeclaredConstructor()
-                    .newInstance();
-      } catch (ReflectiveOperationException | LinkageError e) {
-        throw new SQLException(
-            "The PostgreSQL JDBC driver (" + POSTGRES_DRIVER_CLASS + ") is not on the classpath",
-            "08001",
-            e);
-      }
+    if (driver != null) {
+      return driver;
+    }
+    ClassLoader own = SrvDriver.class.getClassLoader();
+    driver = loadPostgresDriver(own, Thread.currentThread().getContextClassLoader());
+    // A driver from the context class loader belongs to the caller, for example to one web
+    // application. Only a driver from the class loader of this library is kept.
+    if (driver.getClass().getClassLoader() == own) {
       delegate = driver;
     }
     return driver;
+  }
+
+  /**
+   * Loads the PostgreSQL driver through the class loader of this library. If it is not visible
+   * there, as in a container that puts the two jars in different class loaders, the context class
+   * loader of the thread is used.
+   */
+  static Driver loadPostgresDriver(ClassLoader own, ClassLoader context) throws SQLException {
+    Throwable failure;
+    try {
+      return newPostgresDriver(own);
+    } catch (ReflectiveOperationException | LinkageError e) {
+      failure = e;
+    }
+    if (context != null && context != own) {
+      try {
+        return newPostgresDriver(context);
+      } catch (ReflectiveOperationException | LinkageError e) {
+        failure.addSuppressed(e);
+      }
+    }
+    throw new SQLException(
+        "The PostgreSQL JDBC driver ("
+            + POSTGRES_DRIVER_CLASS
+            + ") was not found by the class loader of pgjdbc-srv or by the context class loader",
+        "08001",
+        failure);
+  }
+
+  private static Driver newPostgresDriver(ClassLoader loader)
+      throws ReflectiveOperationException {
+    return (Driver)
+        Class.forName(POSTGRES_DRIVER_CLASS, true, loader).getDeclaredConstructor().newInstance();
   }
 }
