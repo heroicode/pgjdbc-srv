@@ -40,7 +40,7 @@ class DnsSrvResolverTest {
                   "jdbc:postgresql+srv://db.test/app?srvDnsServer=" + dns.address() + "&ssl=true",
                   null);
 
-      assertEquals("jdbc:postgresql://a.db.test:6000,b.db.test:6001/app?ssl=true", url);
+      assertEquals("jdbc:postgresql://a.db.test:6000,b.db.test:6001/app", url);
     }
   }
 

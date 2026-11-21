@@ -112,9 +112,10 @@ class SrvDriverTest {
     assertEquals("_postgresql._tcp.db.example.com", resolver.askedName);
     assertNull(resolver.askedServer);
     assertEquals(
-        "jdbc:postgresql://primary.example.com:5432,standby.example.com:5433/orders"
-            + "?sslmode=require&targetServerType=primary",
+        "jdbc:postgresql://primary.example.com:5432,standby.example.com:5433/orders",
         delegate.url);
+    assertEquals("require", delegate.info.getProperty("sslmode"));
+    assertEquals("primary", delegate.info.getProperty("targetServerType"));
     assertEquals("app", delegate.info.getProperty("user"));
   }
 
@@ -132,7 +133,8 @@ class SrvDriverTest {
 
     assertEquals("_pgbouncer._tcp.db.example.com", resolver.askedName);
     assertEquals("10.0.0.53", resolver.askedServer);
-    assertEquals("jdbc:postgresql://pool.example.com:6432/orders?ssl=true", delegate.url);
+    assertEquals("jdbc:postgresql://pool.example.com:6432/orders", delegate.url);
+    assertEquals("true", delegate.info.getProperty("ssl"));
     assertFalse(delegate.info.containsKey("srvServiceName"));
     assertFalse(delegate.info.containsKey("srvDnsServer"));
     assertTrue(info.containsKey("srvDnsServer"), "the caller's Properties must not change");
@@ -163,8 +165,7 @@ class SrvDriverTest {
     String url = "jdbc:postgresql+srv://db.example.com/orders?sslmode=verify-full";
 
     assertEquals(
-        "jdbc:postgresql://pg1.example.com:5432,a.b.EXAMPLE.com:5432,example.com:5432/orders"
-            + "?sslmode=verify-full",
+        "jdbc:postgresql://pg1.example.com:5432,a.b.EXAMPLE.com:5432,example.com:5432/orders",
         resolve(url, "pg1.example.com", "a.b.EXAMPLE.com", "example.com"));
 
     for (String outside :
@@ -219,7 +220,7 @@ class SrvDriverTest {
 
     // In the URL, and not passed on.
     assertEquals(
-        "jdbc:postgresql://pg1.example.net:5432/orders?ssl=true",
+        "jdbc:postgresql://pg1.example.net:5432/orders",
         driver.resolve(
             "jdbc:postgresql+srv://db.example.com/orders?srvAllowedHostsSuffix=example.net&ssl=true",
             null));
@@ -302,6 +303,38 @@ class SrvDriverTest {
         assertThrows(SQLException.class, () -> SrvDriver.loadPostgresDriver(empty, empty));
     assertEquals("08001", e.getSQLState());
     assertThrows(SQLException.class, () -> SrvDriver.loadPostgresDriver(empty, null));
+  }
+
+  @Test
+  void urlParametersArePassedOnAsPropertiesAndNotInTheUrl() throws SQLException {
+    RecordingDriver delegate = new RecordingDriver();
+    SrvDriver driver =
+        new SrvDriver(
+            new FixedResolver(new SrvRecord(1, 0, 5432, "pg1.example.com")),
+            delegate,
+            new Random(1));
+    Properties info = new Properties();
+    info.setProperty("user", "from-properties");
+    info.setProperty("ApplicationName", "app");
+
+    driver.connect(
+        "jdbc:postgresql+srv://db.example.com/orders"
+            + "?user=from-url&password=hun%2Fter2&options=-c%20a%3Db&ssl",
+        info);
+
+    assertEquals("jdbc:postgresql://pg1.example.com:5432/orders", delegate.url);
+    assertEquals("from-url", delegate.info.getProperty("user"));
+    assertEquals("hun/ter2", delegate.info.getProperty("password"));
+    assertEquals("-c a=b", delegate.info.getProperty("options"));
+    assertEquals("", delegate.info.getProperty("ssl"));
+    assertEquals("app", delegate.info.getProperty("ApplicationName"));
+    assertEquals("from-properties", info.getProperty("user"), "the caller's Properties changed");
+
+    SQLException e =
+        assertThrows(
+            SQLException.class,
+            () -> driver.connect("jdbc:postgresql+srv://db.example.com/orders?password=x%ZZy", null));
+    assertFalse(e.getMessage().contains("ZZ"), e.getMessage());
   }
 
   @Test

@@ -3,7 +3,6 @@ package io.github.heroicode.pgsrv;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
@@ -30,7 +29,6 @@ final class SrvUrl {
   private final String dnsServer;
   private final String targetDomain;
   private final String database;
-  private final String query;
   private final Properties properties;
 
   private SrvUrl(
@@ -38,13 +36,11 @@ final class SrvUrl {
       String dnsServer,
       String targetDomain,
       String database,
-      String query,
       Properties properties) {
     this.srvName = srvName;
     this.dnsServer = dnsServer;
     this.targetDomain = targetDomain;
     this.database = database;
-    this.query = query;
     this.properties = properties;
   }
 
@@ -103,14 +99,21 @@ final class SrvUrl {
     String urlTargetDomain = null;
     String urlTargetDomainAlias = null;
 
-    List<String> passedOn = new ArrayList<String>();
+    // All other URL parameters are passed on as properties, not in the URL. The PostgreSQL
+    // driver can put the URL that it gets in its error messages, and a parameter can be a
+    // password. A URL parameter replaces a property of the same name, as in the PostgreSQL driver.
     for (String parameter : rawQuery.split("&")) {
       if (parameter.isEmpty()) {
         continue;
       }
       int equals = parameter.indexOf('=');
       String name = equals < 0 ? parameter : parameter.substring(0, equals);
-      String value = equals < 0 ? "" : decode(parameter.substring(equals + 1));
+      String value;
+      try {
+        value = equals < 0 ? "" : decode(parameter.substring(equals + 1));
+      } catch (IllegalArgumentException e) {
+        throw invalid("the value of a URL parameter has a percent-escape that is not valid");
+      }
       if (SERVICE_NAME_PROPERTY.equals(name)) {
         serviceName = value;
       } else if (DNS_SERVER_PROPERTY.equals(name)) {
@@ -120,7 +123,7 @@ final class SrvUrl {
       } else if (TARGET_DOMAIN_ALIAS.equals(name)) {
         urlTargetDomainAlias = value;
       } else {
-        passedOn.add(parameter);
+        properties.setProperty(name, value);
       }
     }
 
@@ -161,8 +164,7 @@ final class SrvUrl {
     }
     targetDomain = targetDomain.toLowerCase(Locale.ROOT);
 
-    return new SrvUrl(
-        srvName, dnsServer, targetDomain, database, String.join("&", passedOn), properties);
+    return new SrvUrl(srvName, dnsServer, targetDomain, database, properties);
   }
 
   /**
@@ -209,7 +211,10 @@ final class SrvUrl {
     return targetDomain;
   }
 
-  /** Builds the multi-host URL for the PostgreSQL driver. The driver tries the hosts in order. */
+  /**
+   * Builds the multi-host URL for the PostgreSQL driver. The driver tries the hosts in order. The
+   * URL has no parameters: they are in {@link #getProperties()}.
+   */
   String toPostgresUrl(List<SrvRecord> orderedRecords) {
     StringBuilder url = new StringBuilder("jdbc:postgresql://");
     for (int i = 0; i < orderedRecords.size(); i++) {
@@ -220,9 +225,6 @@ final class SrvUrl {
       url.append(record.getTarget()).append(':').append(record.getPort());
     }
     url.append('/').append(database);
-    if (!query.isEmpty()) {
-      url.append('?').append(query);
-    }
     return url.toString();
   }
 
@@ -234,7 +236,10 @@ final class SrvUrl {
     return dnsServer;
   }
 
-  /** The caller's connection properties, without the properties that belong to this wrapper. */
+  /**
+   * The caller's connection properties and URL parameters, without those that belong to this
+   * wrapper.
+   */
   Properties getProperties() {
     return properties;
   }

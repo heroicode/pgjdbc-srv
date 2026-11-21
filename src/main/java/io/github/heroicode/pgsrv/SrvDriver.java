@@ -16,8 +16,9 @@ import java.util.logging.Logger;
  *
  * <p>It accepts URLs of the form {@code jdbc:postgresql+srv://name[/database][?parameters]}. For
  * each new connection it looks up the SRV records of {@code _postgresql._tcp.name}, puts them in
- * RFC 2782 order, and connects through the PostgreSQL driver with the equivalent multi-host URL
- * {@code jdbc:postgresql://target1:port1,target2:port2/database?parameters}.
+ * RFC 2782 order, and connects through the PostgreSQL driver with the multi-host URL {@code
+ * jdbc:postgresql://target1:port1,target2:port2/database}. The parameters of the SRV URL are
+ * passed on as connection properties.
  *
  * <pre>{@code
  * Connection connection = DriverManager.getConnection(
@@ -118,7 +119,7 @@ public final class SrvDriver implements Driver {
    * @param url a {@code jdbc:postgresql+srv://} URL
    * @param info connection properties, or null
    * @return the multi-host {@code jdbc:postgresql://} URL that {@link #connect} passes to the
-   *     PostgreSQL driver
+   *     PostgreSQL driver. It has no parameters, because they are passed on as properties
    * @throws SQLException if the URL is not valid, the lookup fails, or a target is not permitted
    */
   public String resolve(String url, Properties info) throws SQLException {

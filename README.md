@@ -51,12 +51,15 @@ For each new connection the driver:
 1. Looks up the SRV records of `_postgresql._tcp.db.example.com`.
 2. Puts them in [RFC 2782](https://datatracker.ietf.org/doc/html/rfc2782) order: lowest priority value first, weighted random order among
    records with the same priority.
-3. Connects through pgjdbc with the equivalent multi-host URL, for example
-   `jdbc:postgresql://pg1.example.com:5432,pg2.example.com:5432/orders?sslmode=require`.
+3. Connects through pgjdbc with the multi-host URL, for example
+   `jdbc:postgresql://pg1.example.com:5432,pg2.example.com:5432/orders`. The parameters of
+   your URL are passed on as connection properties, not in that URL, so that a password in a
+   parameter cannot appear in an error message that shows the URL.
 
 pgjdbc tries the hosts in that order, so its multi-host parameters (`targetServerType`,
 `loadBalanceHosts`, `connectTimeout`, ...) work as usual. All URL parameters and connection
-properties are passed on to pgjdbc unchanged, except the two below.
+properties are passed on to pgjdbc, except those below. If a parameter is in the URL and in the
+properties, the URL is used.
 
 The driver registers itself (`META-INF/services/java.sql.Driver`). If your pool wants a class
 name, it is `io.github.heroicode.pgsrv.SrvDriver`.
