@@ -43,7 +43,7 @@ implementation 'io.github.heroicode:pgjdbc-srv:0.1.0'
 Change the URL scheme:
 
 ```
-jdbc:postgresql+srv://db.example.com/orders?sslmode=require
+jdbc:postgresql+srv://db.example.com/orders?sslmode=verify-full
 ```
 
 For each new connection the driver:
